@@ -1,0 +1,10 @@
+== G5 C++ loader vs NumPy
+C++: rows=31013 dim=512
+row   5780: max|diff| = 0.0  bit-identical=True
+row  15854: max|diff| = 0.0  bit-identical=True
+row  16182: max|diff| = 0.0  bit-identical=True
+row  23595: max|diff| = 0.0  bit-identical=True
+row  30271: max|diff| = 0.0  bit-identical=True
+row 5780 first 4 elements  C++  : ['-0.00388511969', '0.00905323215', '0.0227945019', '0.00616266858']
+row 5780 first 4 elements  NumPy: ['-0.00388511969', '0.00905323215', '0.0227945019', '0.00616266858']
+G5: PASS

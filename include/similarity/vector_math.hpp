@@ -13,12 +13,12 @@
 namespace sir {
 
 // Precondition: a.size() == b.size() (checked by callers at API boundaries).
-inline float dot(std::span<const float> a, std::span<const float> b) noexcept {
-    float s = 0.0f;
-    const std::size_t n = a.size();
-    for (std::size_t i = 0; i < n; ++i) s += a[i] * b[i];
-    return s;
-}
+// Defined out of line on purpose: an inline version is compiled separately at every call
+// site, and the compiler may contract (FMA) or schedule it differently per site, giving
+// 1-ulp differences between backends. One compiled instance makes every distance in the
+// system bit-identical for the same pair of vectors, which exact tie-breaking and the
+// "HNSW == brute force at high ef" gate rely on.
+float dot(std::span<const float> a, std::span<const float> b) noexcept;
 
 inline float distance(std::span<const float> a, std::span<const float> b) noexcept {
     return 1.0f - dot(a, b);

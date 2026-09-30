@@ -1,0 +1,16 @@
+{
+  "model": "ViT-B-32",
+  "dim": 512,
+  "rows": 1005,
+  "l2_normalized": true,
+  "dtype": "float32",
+  "byte_order": "little",
+  "layout": "row-major [rows x dim], no header",
+  "created_utc": "2026-09-30T17:17:43+00:00",
+  "git_commit": "353131daeab8c8d216f61d0c6ef7f14cade2fbfe-dirty",
+  "sha256": "87824c504f47f8669e84d805b225ab98e7bf2155ff341baeccb1131259f92aeb",
+  "pretrained": "openai",
+  "queries_file": "evaluation/queries.txt",
+  "queries_sha256": "9ec8ba3162444f1bb36ba3056a4eb66011f9d54acc1ba471dda1e700ebd42998",
+  "device": "cuda"
+}

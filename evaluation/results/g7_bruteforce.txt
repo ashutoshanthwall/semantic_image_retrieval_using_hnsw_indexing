@@ -1,0 +1,5 @@
+== G7 C++ brute force vs NumPy (50 queries, K=10)
+id mismatches (rank-by-rank): 0
+max |score deviation|: 4.501e-07  (tolerance 1e-5)
+smallest adjacent-score gap in reference top-11: 1.138e-06
+G7: PASS
