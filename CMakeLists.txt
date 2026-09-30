@@ -30,6 +30,10 @@ add_library(sir_core STATIC ${SIR_SOURCES})
 target_include_directories(sir_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(sir_core PUBLIC nlohmann_json::nlohmann_json)
 target_compile_options(sir_core PRIVATE ${SIR_WARNINGS})
+string(TOUPPER "${CMAKE_BUILD_TYPE}" SIR_BT_UPPER)
+target_compile_definitions(sir_core PRIVATE
+  SIR_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${SIR_BT_UPPER}}"
+  SIR_BUILD_TYPE="${CMAKE_BUILD_TYPE}")
 
 foreach(app sir_cli sir_benchmark sir_build_index sir_gate)
   if(EXISTS ${CMAKE_SOURCE_DIR}/apps/${app}.cpp)
