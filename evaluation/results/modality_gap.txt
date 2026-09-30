@@ -1,0 +1,2 @@
+text query -> best image cosine (1005 queries): median 0.346, p5 0.312, p95 0.386
+image -> nearest other image cosine (1000 sampled): median 0.825, p5 0.728, p95 0.918
