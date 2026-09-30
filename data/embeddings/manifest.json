@@ -1,0 +1,20 @@
+{
+  "model": "ViT-B-32",
+  "dim": 512,
+  "rows": 31013,
+  "l2_normalized": true,
+  "dtype": "float32",
+  "byte_order": "little",
+  "layout": "row-major [rows x dim], no header",
+  "created_utc": "2026-09-30T17:09:58+00:00",
+  "git_commit": "ef1dc735347b7fd2ae180ce1e48f8143a411ba4a",
+  "sha256": "53cc14e4cdcc207c80ba4a97c33863aebae6e35dee18d7d7c94215032d2c0a25",
+  "pretrained": "openai",
+  "force_quick_gelu": true,
+  "open_clip_version": "3.3.0",
+  "torch_version": "2.6.0+cu124",
+  "device": "cuda",
+  "metadata_sha256": "79c4f24beaa979f894d794559e8b487bfcc092aae5b58e65d4b57929abb1df64",
+  "seed": 1234,
+  "preprocessing": "OpenCV decode (IMREAD_UNCHANGED) -> RGB; Pillow-exact antialiased bicubic shorter-side resize to 224; centre crop 224; /255; CLIP mean/std normalisation"
+}

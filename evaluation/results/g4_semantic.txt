@@ -1,0 +1,50 @@
+== G4 semantic sanity (NumPy, float64 scores)
+
+query: a dog playing in snow
+  1. 0.3336  data/raw/flickr30k/flickr30k-images/3202360797.jpg   | A golden dog is running along a tire track that has been carved out in the snow.
+  2. 0.3331  data/raw/flickr30k/flickr30k-images/391723162.jpg   | A small black and brown dog is standing in the snow.
+  3. 0.3321  data/raw/flickr30k/flickr30k-images/96973080.jpg   | A medium sized brown dog is running through an open white wooded area.
+  4. 0.3319  data/raw/flickr30k/flickr30k-images/2085400856.jpg   | A red dog crouches in the snow.
+  5. 0.3274  data/raw/flickr30k/flickr30k-images/101654506.jpg   | The white and brown dog is running over the surface of the snow.
+
+query: two men playing guitars on a stage
+  1. 0.3300  data/raw/flickr30k/flickr30k-images/3351360323.jpg   | Two musicians in white suits play guitars while surrounded by associated gear and a red curtain.
+  2. 0.3272  data/raw/flickr30k/flickr30k-images/224069602.jpg   | The man in gray trousers is playing a black guitar, and the man in blue jeans is playing a black and blue guitar.
+  3. 0.3246  data/raw/flickr30k/flickr30k-images/3027458414.jpg   | A man dressed in black tunes a black electric guitar.
+  4. 0.3224  data/raw/flickr30k/flickr30k-images/296851123.jpg   | A man in a brown hat and green t-shirt is playing the guitar with a band behind him.
+  5. 0.3199  data/raw/flickr30k/flickr30k-images/4787058215.jpg   | A young man in a plan white t-shirt is playing electric guitar on stage.
+
+query: a child on a red bicycle
+  1. 0.3393  data/raw/flickr30k/flickr30k-images/2549253807.jpg   | A little boy wearing a green shirt is riding on the back of a bicycle built for two with a man in a red shirt.
+  2. 0.3272  data/raw/flickr30k/flickr30k-images/4674933591.jpg   | A little girl riding a two wheeler, wearing her helmet close to the street with passing cars.
+  3. 0.3263  data/raw/flickr30k/flickr30k-images/3425918361.jpg   | A young boy wearing a blue shirt and a red helmet riding a bike on a sidewalk
+  4. 0.3201  data/raw/flickr30k/flickr30k-images/2355819665.jpg   | A child is riding a green bike and wearing an orange shirt and red helmet.
+  5. 0.3191  data/raw/flickr30k/flickr30k-images/179009558.jpg   | A child in a red sweatshirt, jeans, and black bike helmet and a dog pose for a picture outdoors.
+
+query: people eating at an outdoor restaurant
+  1. 0.3382  data/raw/flickr30k/flickr30k-images/4473562541.jpg   | Even though it's rather cool for outdoor dining, many people are enjoying the cafeteria-style food.
+  2. 0.3304  data/raw/flickr30k/flickr30k-images/5301071699.jpg   | A group of people, some with laptops, sit at several small tables with coffee mugs on them.
+  3. 0.3258  data/raw/flickr30k/flickr30k-images/266547962.jpg   | A cowboy tries to adapt with society's desperate infantile need for technology.
+  4. 0.3245  data/raw/flickr30k/flickr30k-images/4074903180.jpg   | A man in a jacket and jeans and a woman in a green coat are reading books on a bench with a baby stroller parked next to it.
+  5. 0.3242  data/raw/flickr30k/flickr30k-images/1042359076.jpg   | A older man holds an object and is looking at two young girls that sit across from him at a table that is outside.
+
+query: a surfer riding a large wave
+  1. 0.3307  data/raw/flickr30k/flickr30k-images/3085667865.jpg   | A lone surfboarder jumping a wave on a white surfboard.
+  2. 0.3263  data/raw/flickr30k/flickr30k-images/141126420.jpg   | Guy in black wetsuit is riding a wave with a white surfboard.
+  3. 0.3248  data/raw/flickr30k/flickr30k-images/3085667767.jpg   | A surfer is flipping up in the air on a surfboard.
+  4. 0.3217  data/raw/flickr30k/flickr30k-images/2842439618.jpg   | A surfer in a black wetsuit catching a wave while another one tries to catch up with him.
+  5. 0.3196  data/raw/flickr30k/flickr30k-images/2086534745.jpg   | A yellow kayak is descending quickly down a white water rapid.
+
+Manual assessment (all 25 images opened and viewed):
+  a dog playing in snow                   5/5 relevant: every result is a dog in snow.
+  two men playing guitars on a stage      5/5 on-topic: #1,#2 two men with guitars on stage;
+                                          #3-#5 one prominent guitarist on stage.
+  a child on a red bicycle                5/5 child on a bicycle; only #5 has a red bike —
+                                          #3/#4 have red helmets (CLIP attribute-binding
+                                          weakness, not a pipeline defect).
+  people eating at an outdoor restaurant  3/5 clearly relevant (#1-#3 outdoor cafe tables);
+                                          #4 people on a bench (weak), #5 street food vendor
+                                          at an outdoor table (partial).
+  a surfer riding a large wave            4/5 relevant (#1-#4 surfers); #5 kayak on white
+                                          water (semantic near-miss).
+Verdict: rankings are semantically coherent; embedding pipeline is correct. G4: PASS

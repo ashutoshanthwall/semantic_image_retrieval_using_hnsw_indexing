@@ -1,0 +1,22 @@
+== G3 embeddings
+rows == valid images         31013                                              PASS
+dim == config dim            512                                                PASS
+manifest rows/dim            (31013, 512)                                       PASS
+manifest sha256              53cc14e4cdcc207c                                   PASS
+NaN count                    0                                                  PASS
+Inf count                    0                                                  PASS
+zero-norm rows               0                                                  PASS
+norms within 1 +- 1e-5       min=0.99999998 max=1.00000002 mean=1.00000000      PASS
+row-order check (re-embed from scratch, batch of 1):
+  row    444 image_id=  1145781754 cosine=1.0000000 PASS
+  row   2607 image_id=  1877935642 cosine=1.0000000 PASS
+  row   3549 image_id=  2133199628 cosine=1.0000000 PASS
+  row  15206 image_id=  3615730936 cosine=1.0000000 PASS
+  row  30377 image_id=  8125199349 cosine=1.0000000 PASS
+G3: PASS
+
+Resumability: job SIGKILLed after 100 s (checkpoint rows_done=6400; partial file held
+6912 rows, 512 un-checkpointed rows were truncated on resume); restart printed
+"RESUME from checkpoint: rows_done=6400/31013" and completed.
+Resumed output vs a separate uninterrupted run: SHA-256 both
+53cc14e4cdcc207c80ba4a97c33863aebae6e35dee18d7d7c94215032d2c0a25 -> byte-identical.
