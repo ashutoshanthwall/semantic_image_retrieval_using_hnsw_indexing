@@ -1,0 +1,23 @@
+CPU: 13th Gen Intel(R) Core(TM) i7-13620H | logical CPUs 16 | physical cores 10 | RAM 15664.54 MiB
+OS: Fedora Linux 44 (KDE Plasma Desktop Edition) (Linux 7.2.5-200.fc44.x86_64 x86_64)
+compiler: GCC 16.2.1 20260819 (Red Hat 16.2.1-2) | Release -O3 -march=native -DNDEBUG
+git: 9c14e0ee677320ac220ee11fecb61d84d5a43e56 | governor powersave | affinity CPUs 4 | loadavg 0.39 0.70 1.78 3/1267 41704
+images 31013 x 512, queries 1005, warm-up 20, repetitions 5, K 10
+brute force: median 7.487 ms, p95 7.574 ms, mean 7.497 ms | R@1 0.2810
+HNSW heuristic+keepPruned: built in 37.19 s, reachable 31013/31013, mean L0 degree 25.54
+  ef= 20  median 0.1905 ms  p95 0.2586  speedup 39.3x  R@5 0.8094  R@10 0.7867  dist/q 547  quality R@1 0.2460
+  ef= 40  median 0.3144 ms  p95 0.4038  speedup 23.8x  R@5 0.8973  R@10 0.8815  dist/q 847  quality R@1 0.2580
+  ef= 80  median 0.5381 ms  p95 0.6638  speedup 13.9x  R@5 0.9562  R@10 0.9456  dist/q 1384  quality R@1 0.2720
+  ef=120  median 0.7465 ms  p95 0.9160  speedup 10.0x  R@5 0.9765  R@10 0.9679  dist/q 1879  quality R@1 0.2760
+HNSW heuristic: built in 24.93 s, reachable 31013/31013, mean L0 degree 18.64
+  ef= 20  median 0.1666 ms  p95 0.2285  speedup 44.9x  R@5 0.7646  R@10 0.7354  dist/q 466  quality R@1 0.2470
+  ef= 40  median 0.2756 ms  p95 0.3484  speedup 27.2x  R@5 0.8716  R@10 0.8490  dist/q 732  quality R@1 0.2620
+  ef= 80  median 0.4796 ms  p95 0.5830  speedup 15.6x  R@5 0.9419  R@10 0.9276  dist/q 1216  quality R@1 0.2700
+  ef=120  median 0.6698 ms  p95 0.8071  speedup 11.2x  R@5 0.9664  R@10 0.9569  dist/q 1665  quality R@1 0.2730
+HNSW naive: built in 19.93 s, reachable 31013/31013, mean L0 degree 24.19
+  ef= 20  median 0.1595 ms  p95 0.2339  speedup 46.9x  R@5 0.7303  R@10 0.7058  dist/q 466  quality R@1 0.2140
+  ef= 40  median 0.2548 ms  p95 0.3457  speedup 29.4x  R@5 0.8261  R@10 0.8067  dist/q 693  quality R@1 0.2410
+  ef= 80  median 0.4302 ms  p95 0.5628  speedup 17.4x  R@5 0.9029  R@10 0.8893  dist/q 1103  quality R@1 0.2650
+  ef=120  median 0.5892 ms  p95 0.7680  speedup 12.7x  R@5 0.9341  R@10 0.9250  dist/q 1481  quality R@1 0.2660
+text encoding (Python helper, CPU, incl. IPC; 100 queries): median 21.49 ms, p95 24.11 ms
+wrote /home/ashutosh/projects/semantic-image-retrieval/evaluation/benchmark_results/summary.md

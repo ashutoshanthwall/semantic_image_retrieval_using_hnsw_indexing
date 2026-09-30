@@ -1,0 +1,14 @@
+backend,variant,ef_search,n_queries,R_at_1,R_at_5,R_at_10
+brute_force,exact,0,1000,0.28100,0.51700,0.59800
+hnsw,heuristic+keepPruned,20,1000,0.24600,0.44100,0.50200
+hnsw,heuristic+keepPruned,40,1000,0.25800,0.46900,0.53900
+hnsw,heuristic+keepPruned,80,1000,0.27200,0.49700,0.57600
+hnsw,heuristic+keepPruned,120,1000,0.27600,0.50700,0.59100
+hnsw,heuristic,20,1000,0.24700,0.42200,0.48900
+hnsw,heuristic,40,1000,0.26200,0.47000,0.54400
+hnsw,heuristic,80,1000,0.27000,0.49400,0.57400
+hnsw,heuristic,120,1000,0.27300,0.50300,0.58400
+hnsw,naive,20,1000,0.21400,0.39500,0.45500
+hnsw,naive,40,1000,0.24100,0.44200,0.51200
+hnsw,naive,80,1000,0.26500,0.48000,0.55300
+hnsw,naive,120,1000,0.26600,0.49200,0.56600

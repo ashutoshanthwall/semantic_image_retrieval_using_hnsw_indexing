@@ -1,0 +1,9 @@
+== Standard Flickr30k 1K test protocol: 1000 images, 5000 captions, exact search
+text->image R@1=0.5876  R@5=0.8350  R@10=0.9004
+
+Reference point (NOT measured by this project; quoted with attribution):
+  open_clip published zero-shot retrieval table, docs/openclip_retrieval_results.csv in
+  https://github.com/mlfoundations/open_clip (row "ViT-B-32, openai",
+  columns "Flickr image retr." = text->image): R@1=0.5878  R@5=0.8356  R@10=0.9002
+Ours (measured above):                           R@1=0.5876  R@5=0.8350  R@10=0.9004
+Difference <= 0.0006 on every metric -> the embedding pipeline reproduces the reference.
