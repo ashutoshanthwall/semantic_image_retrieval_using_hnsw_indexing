@@ -19,9 +19,18 @@ FetchContent_Declare(json
 FetchContent_Declare(googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+# Header-only HTTP server, used only by the optional local web UI (sir_web).
+FetchContent_Declare(httplib
+  URL https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.58.0.tar.gz
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_ZSTD_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+find_package(Threads REQUIRED)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(json googletest)
+FetchContent_MakeAvailable(json googletest httplib)
 
 set(SIR_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
 
@@ -42,6 +51,12 @@ foreach(app sir_cli sir_benchmark sir_build_index sir_gate)
     target_compile_options(${app} PRIVATE ${SIR_WARNINGS})
   endif()
 endforeach()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/apps/sir_web.cpp)
+  add_executable(sir_web apps/sir_web.cpp)
+  target_link_libraries(sir_web PRIVATE sir_core httplib::httplib Threads::Threads)
+  target_compile_options(sir_web PRIVATE ${SIR_WARNINGS})
+endif()
 
 enable_testing()
 include(GoogleTest)

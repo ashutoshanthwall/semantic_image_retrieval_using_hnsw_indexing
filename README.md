@@ -29,6 +29,13 @@ contribution is the retrieval engine: the exact baseline, the HNSW graph, and th
 controlled exact-vs-approximate analysis. It also includes a graph-connectivity defect
 found and fixed along the way (§6.4).
 
+**Quick start** (after the pipeline has been run once, see §9):
+
+```bash
+build/sir_web          # then open http://127.0.0.1:8080  (Ctrl+C to stop)
+build/sir_cli a dog playing in snow
+```
+
 ---
 
 ## 1. Architecture and the Python / C++ boundary
@@ -77,6 +84,7 @@ index persistence and validation; benchmarking; the search pipeline; the CLI.
 | Search orchestration, query validation, RAII subprocess | ✔ | POSIX `posix_spawn`, `socketpair` |
 | Latency statistics, recall metrics, system/memory capture | ✔ | `std::chrono::steady_clock`, `/proc` |
 | JSON parsing | — | `nlohmann/json` |
+| HTTP server for the optional web UI | — | `cpp-httplib` |
 | Unit-test framework | — | GoogleTest |
 | Image decoding, colour conversion | — | OpenCV (Python) |
 | Bicubic resampling matching CLIP's processor | ✔ NumPy re-implementation of Pillow's fixed-point algorithm | — |
@@ -409,6 +417,43 @@ advantage matters as the collection grows, because brute force scales linearly w
 
 ---
 
+## 5b. Local web UI (optional demo layer)
+
+`build/sir_web` serves a single-page UI at **http://127.0.0.1:8080**. It has a search
+box, K (5/10/20), an efSearch slider and example queries. It shows brute-force and HNSW
+results side by side as thumbnails, with scores, image ids and the first caption for
+reference. Above the results it shows text-embedding time, both retrieval latencies,
+speedup and Recall@K. Results that one backend returned and the other did not are
+flagged ("missed by HNSW" / "not in exact top-K"). Moving the slider to a low efSearch
+makes recall loss visible. Searches are kept in the URL (`#q=…&k=…&ef=…`), so they can
+be reloaded or shared.
+
+Design constraints:
+- It is a thin front end over the same `SearchEngine` and the same comparison routine
+  (`apps/compare.hpp`) as the CLI, and adds no retrieval logic. The engine, the
+  benchmark and all gates are unchanged.
+- **Scope note:** the original brief listed a web UI as out of scope. It was added
+  afterwards at the author's request, as a demo convenience. It is not part of the
+  research result.
+- It binds to `127.0.0.1` by default. Images are served only by numeric internal id
+  (`/img/<id>`), so no client-supplied path ever reaches the filesystem. Page text is
+  inserted with `textContent`, never `innerHTML`.
+- Searches are serialised with a mutex, because `HNSWIndex::search` and the encoder
+  helper are single-threaded by design. Image requests are served concurrently.
+- The UI allows K ≤ 50 and 1 ≤ efSearch ≤ 1000. Bad input gets an HTTP 400 with the
+  engine's specific message.
+- Ctrl+C or SIGTERM stops the server cleanly (a `sigwait` thread), so the text-encoder
+  helper is shut down by its destructor.
+- UI latencies are unpinned single-query medians and are illustrative only. The
+  benchmark (§5) gives the measured numbers.
+- HTTP comes from `cpp-httplib` (header-only, FetchContent, TLS and compression off).
+  The page is plain HTML/CSS/JS in `web/index.html` with no external requests, and it
+  follows the system light/dark setting.
+
+Options: `--port 8080`, `--host 127.0.0.1`, `--index path`, `--encoder-log file`.
+
+---
+
 ## 6. Absolute retrieval quality, and a defect found on the way
 
 ### 6.1 Held-out caption track (§9 of the brief)
@@ -506,6 +551,7 @@ bookkeeping always equals a full recount.
 | JSON metadata | A single JSON file (20.5 MB). The C++ apps load metadata plus embeddings, including the SHA-256 and per-row validation, in 0.45 s: simple, and fast enough. |
 | C++ OpenCV | Not linked: C++ never touches pixels. |
 | Index checksum | SHA-256 over the whole file, so corruption anywhere is detected, not just in the header. |
+| Web UI | Added after the core project at the author's request, although the brief listed it as out of scope. It is a thin layer over `SearchEngine`, using cpp-httplib, loopback only (§5b). |
 
 ---
 
@@ -581,6 +627,7 @@ build/sir_benchmark --pin-cpu 4 --measure-encoder  # -> evaluation/benchmark_res
 
 build/sir_cli a dog playing in snow                # one query
 build/sir_cli --k 10 --ef 120                      # interactive; empty line exits
+build/sir_web                                      # web UI at http://127.0.0.1:8080
 ```
 
 Useful flags:
@@ -602,7 +649,8 @@ include/, src/
   persistence/              SHA-256, IndexManager (file format, validation)
   search/                   SearchEngine
   benchmark/                latency stats, recall metrics, system info
-apps/                       sir_cli, sir_benchmark, sir_build_index, sir_gate
+apps/                       sir_cli, sir_web, sir_benchmark, sir_build_index, sir_gate (+ compare.hpp shared by cli/web)
+web/                        index.html (the web UI page)
 tests/                      GoogleTest suites (math, top-K, SHA, store, metadata, BF, HNSW, persistence, engine)
 scripts/                    Python pipeline, gate scripts, helper server, plots, run_all.sh
 data/raw/                   read-only after download (git-ignored)

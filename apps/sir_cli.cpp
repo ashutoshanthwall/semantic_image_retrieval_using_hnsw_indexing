@@ -8,10 +8,9 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
-#include <set>
 
 #include "app_common.hpp"
-#include "benchmark/latency.hpp"
+#include "compare.hpp"
 #include "data/errors.hpp"
 #include "embedding/text_encoder_process.hpp"
 #include "index/brute_force_index.hpp"
@@ -24,16 +23,6 @@ namespace {
 
 constexpr int kTimingRuns = 5;  // a single query is timed several times; median reported
 
-double medianRetrievalMs(const SearchEngine& e, std::span<const float> q, int k,
-                         SearchResponse& out) {
-    std::vector<double> ms;
-    for (int i = 0; i < kTimingRuns; ++i) {
-        out = e.searchEmbedding(q, k);
-        ms.push_back(out.retrievalMs);
-    }
-    return summarize(ms).medianMs;
-}
-
 void printResults(const std::string& title, const SearchResponse& r, double ms) {
     std::cout << "\n" << title << "  (retrieval " << std::fixed << std::setprecision(3) << ms
               << " ms)\n";
@@ -45,26 +34,14 @@ void printResults(const std::string& title, const SearchResponse& r, double ms) 
 
 void answer(const std::string& query, int k, const SearchEngine& bfEngine,
             const SearchEngine& hnswEngine) {
-    bfEngine.checkK(k);
-    const auto t0 = std::chrono::steady_clock::now();
-    const std::vector<float> q = bfEngine.embedQuery(query);
-    const double encMs =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-    SearchResponse bf, hn;
-    const double bfMs = medianRetrievalMs(bfEngine, q, k, bf);
-    const double hnMs = medianRetrievalMs(hnswEngine, q, k, hn);
-    std::set<int> truth;
-    for (const auto& s : bf.results) truth.insert(s.internalId);
-    std::size_t overlap = 0;
-    for (const auto& s : hn.results) overlap += truth.count(s.internalId);
-    std::cout << "\nquery: \"" << SearchEngine::normalizeQueryText(query) << "\"   (text "
-              << "embedding " << std::fixed << std::setprecision(1) << encMs
-              << " ms, excluded from retrieval latency)";
-    printResults("Brute force (exact) top-" + std::to_string(k), bf, bfMs);
-    printResults("HNSW top-" + std::to_string(k), hn, hnMs);
+    const app::Comparison c = app::compareBackends(query, k, bfEngine, hnswEngine, kTimingRuns);
+    std::cout << "\nquery: \"" << c.query << "\"   (text embedding " << std::fixed
+              << std::setprecision(1) << c.encodeMs << " ms, excluded from retrieval latency)";
+    printResults("Brute force (exact) top-" + std::to_string(k), c.exact, c.exactMs);
+    printResults("HNSW top-" + std::to_string(k), c.approx, c.approxMs);
     std::cout << "\nRecall@" << k << " (HNSW vs brute force): " << std::setprecision(2)
-              << static_cast<double>(overlap) / k << "   speedup: " << std::setprecision(1)
-              << bfMs / hnMs << "x   (median of " << kTimingRuns << " runs each)\n";
+              << c.recall << "   speedup: " << std::setprecision(1) << c.speedup
+              << "x   (median of " << kTimingRuns << " runs each)\n";
 }
 
 }  // namespace
