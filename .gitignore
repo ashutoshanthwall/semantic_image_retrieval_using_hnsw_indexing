@@ -1,0 +1,12 @@
+.venv/
+build/
+__pycache__/
+*.pyc
+data/raw/
+data/embeddings/*.bin
+data/embeddings/*.partial
+data/embeddings/*.ckpt.json
+data/index/
+data/processed/metadata.json
+data/processed/validation_cache.json
+evaluation/*.bin
