@@ -1,0 +1,8 @@
+[G8] N=10 D=8 k=5 efSearch=10 heuristic: 50/50 random queries identical to brute force (+10 self-queries)
+[G8] N=10 D=8 k=10 efSearch=10 heuristic: 50/50 random queries identical to brute force (+10 self-queries)
+[G8] N=10 D=8 k=10 efSearch=10 naive: 50/50 random queries identical to brute force (+10 self-queries)
+[G8] N=100 D=8 k=10 efSearch=100 heuristic: 50/50 random queries identical to brute force (+100 self-queries)
+[G8] N=100 D=8 k=10 efSearch=100 naive: 50/50 random queries identical to brute force (+100 self-queries)
+[G8] N=5000 D=32 M=16 efC=200 heuristic Recall@10:  ef=20:0.8530  ef=40:0.9570  ef=80:0.9975  ef=120:1.0000
+[G8] N=5000 D=32 M=16 efC=200 naive     Recall@10:  ef=20:0.8450  ef=40:0.9470  ef=80:0.9925  ef=120:0.9980
+G8: PASS (all exactness checks; see tests/test_hnsw.cpp)

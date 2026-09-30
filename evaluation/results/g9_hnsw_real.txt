@@ -1,0 +1,13 @@
+embeddings: 31013 x 512 (sha256 53cc14e4cdcc207c...)
+HNSW: M=16 efConstruction=200 seed=42 selection=heuristic keepPruned=1 protectLastInEdge=1
+built in 37.36 s; saved to /home/ashutosh/projects/semantic-image-retrieval/data/index/hnsw.idx (3479 KiB)
+graph: nodes=31013 maxLevel=5 meanDegree(L0)=25.54 reachable(L0)=31013/31013
+nodes per level: L0=31013 L1=1924 L2=121 L3=11 L4=3 L5=1
+layer-0 nodes with in-degree 0 (excluding entry): 0
+memoryBytes(): HNSW graph 7024500, embeddings 63514624
+Recall@10 vs brute force over 1005 queries:
+  efSearch=  20  Recall@10=0.7867  mean distance evaluations/query=547
+  efSearch=  40  Recall@10=0.8815  mean distance evaluations/query=847
+  efSearch=  80  Recall@10=0.9456  mean distance evaluations/query=1384
+  efSearch= 120  Recall@10=0.9679  mean distance evaluations/query=1879
+G9 gate: Recall@10 = 0.9456 at efSearch=80 (>= 0.90) -> PASS

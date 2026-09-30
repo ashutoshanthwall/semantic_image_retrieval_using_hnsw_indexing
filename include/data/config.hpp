@@ -14,6 +14,8 @@ struct HnswParams {
     int efSearch = 80;            // candidate-list size during queries
     std::uint64_t seed = 42;      // level-assignment RNG seed
     bool selectHeuristic = true;  // true: paper's SELECT_NEIGHBORS_HEURISTIC, false: naive top-M
+    bool keepPrunedConnections = true;  // heuristic only: refill to M with discarded candidates
+    bool protectLastInEdge = true;  // pruning never removes a node's only incoming edge
 };
 
 struct EvaluationParams {

@@ -30,6 +30,8 @@ AppConfig loadConfig(const std::filesystem::path& configFile) {
         c.hnsw.efSearch = h.at("ef_search").get<int>();
         c.hnsw.seed = h.at("seed").get<std::uint64_t>();
         c.hnsw.selectHeuristic = h.at("select_heuristic").get<bool>();
+        c.hnsw.keepPrunedConnections = h.at("keep_pruned_connections").get<bool>();
+        c.hnsw.protectLastInEdge = h.at("protect_last_in_edge").get<bool>();
         const auto& e = j.at("evaluation");
         c.evaluation.seed = e.at("seed").get<std::uint64_t>();
         c.evaluation.warmupQueries = e.at("warmup_queries").get<int>();

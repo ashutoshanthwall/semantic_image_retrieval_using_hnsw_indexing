@@ -1,0 +1,50 @@
+== G9 pruning ablation (M=16, efConstruction=200, seed=42, 1005 queries, Recall@10 vs brute force)
+=== selection=heuristic keepPruned=0 protect=1
+built in 24.86 s; saved to /tmp/claude-1000/-home-ashutosh/e62b0467-d94a-4271-a3a7-8532dafd0f54/scratchpad/abl.idx (2609 KiB)
+graph: nodes=31013 maxLevel=5 meanDegree(L0)=18.64 reachable(L0)=31013/31013
+layer-0 nodes with in-degree 0 (excluding entry): 0
+  efSearch=  20  Recall@10=0.7354  mean distance evaluations/query=466
+  efSearch=  40  Recall@10=0.8490  mean distance evaluations/query=732
+  efSearch=  80  Recall@10=0.9276  mean distance evaluations/query=1216
+  efSearch= 120  Recall@10=0.9569  mean distance evaluations/query=1665
+=== selection=heuristic keepPruned=1 protect=1
+built in 37.17 s; saved to /tmp/claude-1000/-home-ashutosh/e62b0467-d94a-4271-a3a7-8532dafd0f54/scratchpad/abl.idx (3479 KiB)
+graph: nodes=31013 maxLevel=5 meanDegree(L0)=25.54 reachable(L0)=31013/31013
+layer-0 nodes with in-degree 0 (excluding entry): 0
+  efSearch=  20  Recall@10=0.7867  mean distance evaluations/query=547
+  efSearch=  40  Recall@10=0.8815  mean distance evaluations/query=847
+  efSearch=  80  Recall@10=0.9456  mean distance evaluations/query=1384
+  efSearch= 120  Recall@10=0.9679  mean distance evaluations/query=1879
+=== selection=naive keepPruned=0 protect=1
+built in 19.88 s; saved to /tmp/claude-1000/-home-ashutosh/e62b0467-d94a-4271-a3a7-8532dafd0f54/scratchpad/abl.idx (3314 KiB)
+graph: nodes=31013 maxLevel=5 meanDegree(L0)=24.19 reachable(L0)=31013/31013
+layer-0 nodes with in-degree 0 (excluding entry): 0
+  efSearch=  20  Recall@10=0.7058  mean distance evaluations/query=466
+  efSearch=  40  Recall@10=0.8067  mean distance evaluations/query=693
+  efSearch=  80  Recall@10=0.8893  mean distance evaluations/query=1103
+  efSearch= 120  Recall@10=0.9250  mean distance evaluations/query=1481
+=== selection=naive keepPruned=0 protect=0
+built in 19.86 s; saved to /tmp/claude-1000/-home-ashutosh/e62b0467-d94a-4271-a3a7-8532dafd0f54/scratchpad/abl.idx (3314 KiB)
+graph: nodes=31013 maxLevel=5 meanDegree(L0)=24.19 reachable(L0)=31002/31013
+layer-0 nodes with in-degree 0 (excluding entry): 11
+  unreachable id=347 level=0 outDegree=16 exact NN: 14664(sim 0.76190) 11782(sim 0.72569)
+  unreachable id=383 level=0 outDegree=17 exact NN: 1395(sim 0.67146) 4142(sim 0.64309)
+  unreachable id=1021 level=0 outDegree=17 exact NN: 20810(sim 0.67481) 21223(sim 0.66296)
+  unreachable id=1951 level=0 outDegree=16 exact NN: 11364(sim 0.73014) 20253(sim 0.70911)
+  unreachable id=2782 level=0 outDegree=16 exact NN: 26365(sim 0.72562) 18821(sim 0.71775)
+  unreachable id=4286 level=0 outDegree=16 exact NN: 28172(sim 0.70131) 10888(sim 0.70023)
+  unreachable id=4816 level=0 outDegree=16 exact NN: 10650(sim 0.67603) 18714(sim 0.67518)
+  unreachable id=6242 level=0 outDegree=16 exact NN: 23046(sim 0.75602) 19452(sim 0.73048)
+  unreachable id=6318 level=0 outDegree=16 exact NN: 20900(sim 0.71310) 23707(sim 0.70439)
+  unreachable id=6427 level=0 outDegree=16 exact NN: 24221(sim 0.74860) 7954(sim 0.72796)
+  unreachable id=12472 level=0 outDegree=16 exact NN: 15312(sim 0.86675) 10571(sim 0.86544)
+  efSearch=  20  Recall@10=0.7055  mean distance evaluations/query=466
+  efSearch=  40  Recall@10=0.8066  mean distance evaluations/query=693
+  efSearch=  80  Recall@10=0.8888  mean distance evaluations/query=1103
+  efSearch= 120  Recall@10=0.9246  mean distance evaluations/query=1480
+=== selection=heuristic keepPruned=0 protect=0   (measured earlier in this session, same seed)
+built in 25.05 s; reachable(L0)=31009/31013; in-degree-0 nodes: 4 (ids 728, 9004, 17782, 19061)
+  efSearch=20 0.7349 | 40 0.8487 | 80 0.9273 | 120 0.9565   (dist evals 466 / 732 / 1216 / 1665)
+=== selection=heuristic keepPruned=1 protect=0   (measured earlier in this session, same seed)
+built in 37.15 s; reachable(L0)=31012/31013; in-degree-0 nodes: 1 (id 728)
+  efSearch=20 0.7865 | 40 0.8814 | 80 0.9455 | 120 0.9678   (dist evals 547 / 847 / 1384 / 1879)

@@ -39,7 +39,9 @@
     "ef_construction": 200,
     "ef_search": 80,
     "seed": 42,
-    "select_heuristic": true
+    "select_heuristic": true,
+    "keep_pruned_connections": true,
+    "protect_last_in_edge": true
   },
   "evaluation": {
     "seed": 2024,
