@@ -1,0 +1,15 @@
+== G2 preprocessing fidelity (ours = OpenCV decode + Pillow-exact resample)
+internal_id      size  max_abs_diff      cosine
+       3903 500x333      0.000e+00   1.0000000  PASS
+      10468 500x333      0.000e+00   1.0000000  PASS
+      16466 500x333      0.000e+00   1.0000000  PASS
+      16771 500x375      0.000e+00   1.0000000  PASS
+      21207 368x500      0.000e+00   1.0000000  PASS
+      28180 500x333      0.000e+00   1.0000000  PASS
+       3363 500x335      0.000e+00   1.0000000  PASS
+      28970 500x500      0.000e+00   1.0000000  PASS
+       7316 500x333      0.000e+00   1.0000000  PASS
+      29321 333x500      0.000e+00   1.0000000  PASS
+G2: PASS
+
+Extended check: 2000 random images, max_abs_diff max=0.000e+00, images with diff>0: 0, >=1e-4: 0  (50s)
