@@ -1,0 +1,41 @@
+#pragma once
+// Typed view of config/config.json. Paths in the JSON are relative to the project root,
+// which is the parent of the directory containing the config file.
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace sir {
+
+struct HnswParams {
+    int M = 16;                   // max neighbours per node on layers >= 1 (2M on layer 0)
+    int efConstruction = 200;     // candidate-list size during insertion
+    int efSearch = 80;            // candidate-list size during queries
+    std::uint64_t seed = 42;      // level-assignment RNG seed
+    bool selectHeuristic = true;  // true: paper's SELECT_NEIGHBORS_HEURISTIC, false: naive top-M
+};
+
+struct EvaluationParams {
+    std::uint64_t seed = 0;
+    int warmupQueries = 20;
+    int repetitions = 5;
+    std::vector<int> efSearchSweep;
+};
+
+struct AppConfig {
+    std::filesystem::path root;
+    std::string modelName;
+    std::size_t dim = 0;
+    double normTolerance = 1e-5;
+    HnswParams hnsw;
+    EvaluationParams evaluation;
+    // Resolved absolute paths.
+    std::filesystem::path metadata, embeddings, manifest, index, queries, queryGroundTruth,
+        queryEmbeddings, queryManifest, benchmarkResults, textEncoderServer, python,
+        configFile;
+};
+
+AppConfig loadConfig(const std::filesystem::path& configFile);
+
+}  // namespace sir

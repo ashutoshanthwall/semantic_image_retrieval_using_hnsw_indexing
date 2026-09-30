@@ -1,0 +1,19 @@
+{
+  "total_found": 31783,
+  "total_valid": 31013,
+  "total_excluded": 770,
+  "sum_check": true,
+  "annotation_rows": 31014,
+  "image_files_on_disk": 31783,
+  "captions_total": 155065,
+  "captions_truncated_at_77_tokens": 3,
+  "exclusion_reasons": {
+    "no_captions": 769,
+    "duplicate_of": 1
+  },
+  "splits": {
+    "train": 28999,
+    "test": 1000,
+    "val": 1014
+  }
+}

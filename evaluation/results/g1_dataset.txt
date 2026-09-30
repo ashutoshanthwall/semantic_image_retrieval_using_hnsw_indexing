@@ -1,0 +1,55 @@
+== G1 dataset
+total_found: 31783
+total_valid: 31013
+total_excluded: 770
+sum_check: True
+annotation_rows: 31014
+image_files_on_disk: 31783
+captions_total: 155065
+captions_truncated_at_77_tokens: 3
+exclusion_reasons: {'no_captions': 769, 'duplicate_of': 1}
+splits: {'train': 28999, 'test': 1000, 'val': 1014}
+unreadable/corrupt files: 0
+
+[15403] data/raw/flickr30k/flickr30k-images/3641999223.jpg (500x361)
+   - A man playing a sport in a green uniform holding a paddle over his head.
+   - A person plays cricket while being watched by a crowd.
+   - A man runs after a cricket ball on a grass field.
+   - A person playing cricket in an all green outfit
+   - A sports player in a green uniform.
+
+[5954] data/raw/flickr30k/flickr30k-images/246343513.jpg (500x375)
+   - A gentleman of color is sitting at a desk with monitor displaying a webpage before him, keyboard at hand, coffee or tea at hand, tower in the corner, and he is wearing glasses, a white shirt under a blue jacket, with a large smile.
+   - One man wearing glasses, sitting at a desk with a computer and cup of coffee and his hand to his face
+   - A person having a conversation with another, as a computer task awaits his return.
+   - A guy with glasses is working on a computer in his office.
+   - Person at their desk using a computer.
+
+[23863] data/raw/flickr30k/flickr30k-images/4871268492.jpg (500x333)
+   - Small oriental girl trying to look through a telescope with eyes closed.
+   - A little girl is squinting and looking into a lens.
+   - A baby is looking into what looks like a telescope.
+   - A little girl is trying to look in the viewer.
+   - A little girl looking through a telescope.
+
+[18951] data/raw/flickr30k/flickr30k-images/4406961500.jpg (500x376)
+   - A woman holding a microphone wearing a brown jacket, in front of a sign which says "comedians you should know."
+   - A brunet male in a brown blazer talking to an audience at a comedian show.
+   - A woman with dark hair and a brown coat holding a microphone on stage.
+   - A white comedian with long hair performs on stage.
+   - A young comedian in a brown jacket doing an act.
+
+[9953] data/raw/flickr30k/flickr30k-images/2986280913.jpg (375x500)
+   - A boy dressed in green running with a brown and white dog in a green field.
+   - A white dog and green shirted child running in the grass.
+   - Boy and white dog running in grassy field
+   - A boy and a dog running on grass
+   - A child and small dog running.
+
+Manual inspection (images opened and viewed):
+  3641999223.jpg  cricketer in green uniform batting, crowd behind        -> MATCHES captions
+  246343513.jpg   man in glasses at desk, monitor, coffee cup, on phone   -> MATCHES captions
+  4871268492.jpg  little girl squinting into a coin-operated telescope     -> MATCHES captions
+  4406961500.jpg  performer w/ microphone, "COMEDIANS YOU SHOULD KNOW"    -> MATCHES captions
+  2986280913.jpg  boy in green running with white/brown dog on grass      -> MATCHES captions
+G1: PASS
