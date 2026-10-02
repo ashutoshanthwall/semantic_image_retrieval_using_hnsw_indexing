@@ -10,3 +10,34 @@ data/index/
 data/processed/metadata.json
 data/processed/validation_cache.json
 evaluation/*.bin
+# Build files
+/build/
+cmake-build-*/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Datasets and generated data
+data/raw/
+data/processed/
+
+# Model weights and generated indexes
+models/
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+
