@@ -2,14 +2,15 @@
 
 #include <cstring>
 #include <fstream>
-#include <vector>
 
+#include "algorithms/basic.hpp"
+#include "containers/vector.hpp"
 #include "data/errors.hpp"
 
 namespace sir {
 namespace {
 
-constexpr std::array<std::uint32_t, 64> K = {
+constexpr FixedArray<std::uint32_t, 64> K = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
     0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
     0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
@@ -58,7 +59,7 @@ void Sha256::update(const void* data, std::size_t n) {
     const auto* p = static_cast<const std::uint8_t*>(data);
     totalBytes_ += n;
     if (bufLen_ > 0) {
-        const std::size_t take = std::min(n, 64 - bufLen_);
+        const std::size_t take = minOf(n, 64 - bufLen_);
         std::memcpy(buf_.data() + bufLen_, p, take);
         bufLen_ += take; p += take; n -= take;
         if (bufLen_ == 64) { block(buf_.data()); bufLen_ = 0; }
@@ -69,7 +70,7 @@ void Sha256::update(const void* data, std::size_t n) {
 
 void Sha256::update(std::span<const std::uint8_t> data) { update(data.data(), data.size()); }
 
-std::array<std::uint8_t, 32> Sha256::finish() {
+FixedArray<std::uint8_t, 32> Sha256::finish() {
     const std::uint64_t bits = totalBytes_ * 8;
     const std::uint8_t pad = 0x80;
     update(&pad, 1);
@@ -78,7 +79,7 @@ std::array<std::uint8_t, 32> Sha256::finish() {
     std::uint8_t len[8];
     for (int i = 0; i < 8; ++i) len[i] = static_cast<std::uint8_t>(bits >> (56 - 8 * i));
     update(len, 8);
-    std::array<std::uint8_t, 32> out{};
+    FixedArray<std::uint8_t, 32> out{};
     for (int i = 0; i < 8; ++i)
         for (int j = 0; j < 4; ++j)
             out[static_cast<std::size_t>(4 * i + j)] =
@@ -105,7 +106,7 @@ std::string sha256File(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw PersistenceError("cannot open for hashing: " + path.string());
     Sha256 h;
-    std::vector<char> buf(1 << 20);
+    Vector<char> buf(1 << 20);
     while (in) {
         in.read(buf.data(), static_cast<std::streamsize>(buf.size()));
         h.update(buf.data(), static_cast<std::size_t>(in.gcount()));

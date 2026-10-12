@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <limits>
 
+#include "algorithms/sort.hpp"
 #include "data/errors.hpp"
 #include "index/brute_force_index.hpp"
 #include "test_helpers.hpp"
@@ -18,10 +18,10 @@ TEST(BruteForce, MatchesFullSortOrderAndScores) {
     for (int t = 0; t < 20; ++t) {
         std::span<const float> qs(q.data() + t * D, D);
         const auto got = bf.search(qs, 10);
-        std::vector<Candidate> all;
+        Vector<Candidate> all;
         for (std::size_t i = 0; i < N; ++i)
             all.push_back({static_cast<int>(i), 1.0f - (1.0f - dot(qs, store.row(i)))});
-        std::sort(all.begin(), all.end(), [](auto& a, auto& b) {
+        sortRange(all.begin(), all.end(), [](auto& a, auto& b) {
             return a.score > b.score || (a.score == b.score && a.id < b.id);
         });
         for (int r = 0; r < 10; ++r) {
@@ -32,9 +32,9 @@ TEST(BruteForce, MatchesFullSortOrderAndScores) {
 }
 
 TEST(BruteForce, ExactTiesBreakByAscendingId) {
-    std::vector<float> v = test::randomUnitVectors(6, 4, 3);
-    for (int dup : {4, 1, 5})  // rows 1, 4, 5 identical to row 2
-        std::copy_n(v.begin() + 2 * 4, 4, v.begin() + dup * 4);
+    Vector<float> v = test::randomUnitVectors(6, 4, 3);
+    for (std::size_t dup : {4u, 1u, 5u})  // rows 1, 4, 5 identical to row 2
+        for (std::size_t j = 0; j < 4; ++j) v[dup * 4 + j] = v[2 * 4 + j];
     EmbeddingStore store(4, std::move(v), 1e-5);
     BruteForceIndex bf(store);
     bf.insertAll();

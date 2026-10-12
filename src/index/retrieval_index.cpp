@@ -1,18 +1,19 @@
 #include "index/retrieval_index.hpp"
 
-#include <algorithm>
 #include <string>
 
+#include "algorithms/sort.hpp"
 #include "data/errors.hpp"
 #include "similarity/vector_math.hpp"
 
 namespace sir {
 
-std::vector<Candidate> toCandidates(const std::vector<Neighbor>& closestFirst) {
-    std::vector<Candidate> out;
+Vector<Candidate> toCandidates(const Vector<Neighbor>& closestFirst) {
+    Vector<Candidate> out;
     out.reserve(closestFirst.size());
     for (const Neighbor& n : closestFirst) out.push_back({n.id, distanceToScore(n.dist)});
-    std::stable_sort(out.begin(), out.end(), [](const Candidate& a, const Candidate& b) {
+    // A total order (ids are unique), so the result does not depend on sort stability.
+    sortRange(out.begin(), out.end(), [](const Candidate& a, const Candidate& b) {
         return a.score > b.score || (a.score == b.score && a.id < b.id);
     });
     return out;

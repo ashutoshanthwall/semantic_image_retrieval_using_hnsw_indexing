@@ -17,12 +17,12 @@ namespace {
 // Deterministic fake: returns a fixed (unnormalised) vector, or a bad one on request.
 class FakeEncoder : public QueryEncoder {
 public:
-    explicit FakeEncoder(std::vector<float> v) : v_(std::move(v)) {}
-    std::vector<float> encode(std::string_view text) override {
+    explicit FakeEncoder(Vector<float> v) : v_(std::move(v)) {}
+    Vector<float> encode(std::string_view text) override {
         lastText = std::string(text);
         return v_;
     }
-    std::vector<float> v_;
+    Vector<float> v_;
     std::string lastText;
 };
 
@@ -30,7 +30,7 @@ struct World {
     static constexpr std::size_t N = 300, D = 16;
     EmbeddingStore store{D, test::randomUnitVectors(N, D, 21), 1e-5};
     MetadataManager meta{[] {
-        std::vector<ImageRecord> r;
+        Vector<ImageRecord> r;
         for (std::size_t i = 0; i < N; ++i)
             r.push_back({static_cast<int>(i), "img" + std::to_string(i),
                          "/data/img" + std::to_string(i) + ".jpg", 10, 10, "train", {"c"}});

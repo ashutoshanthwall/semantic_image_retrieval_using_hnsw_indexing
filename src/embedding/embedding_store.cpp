@@ -36,7 +36,7 @@ void validateVector(std::span<const float> v, std::size_t expectedDim, double no
     }
 }
 
-EmbeddingStore::EmbeddingStore(std::size_t dim, std::vector<float> data, double normTolerance,
+EmbeddingStore::EmbeddingStore(std::size_t dim, Vector<float> data, double normTolerance,
                                std::string sourceSha256)
     : dim_(dim), data_(std::move(data)), sha256_(std::move(sourceSha256)) {
     if (dim_ == 0) throw EmbeddingError("embedding dimension must be > 0");
@@ -75,7 +75,7 @@ EmbeddingStore EmbeddingStore::load(const std::filesystem::path& binPath,
                              " bytes, manifest implies " + std::to_string(expected) +
                              " (truncated or wrong file)");
 
-    std::vector<float> data(m.rows * m.dim);
+    Vector<float> data(m.rows * m.dim);
     std::ifstream in(binPath, std::ios::binary);
     if (!in.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(bytes)))
         throw EmbeddingError("short read from " + binPath.string());

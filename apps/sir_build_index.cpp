@@ -5,9 +5,9 @@
 //                   [--select-heuristic heuristic|naive] [--no-recall]
 #include <iomanip>
 #include <iostream>
-#include <set>
 
 #include "app_common.hpp"
+#include "containers/flat_set.hpp"
 #include "index/brute_force_index.hpp"
 #include "persistence/index_manager.hpp"
 
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         const EmbeddingStore queries = app::loadQueryStore(cfg);
         BruteForceIndex bf(store);
         bf.insertAll();
-        std::vector<std::set<int>> truth(queries.size());
+        Vector<FlatSet<int>> truth(queries.size());
         for (std::size_t q = 0; q < queries.size(); ++q)
             for (const Candidate& c : bf.search(queries.row(q), 10)) truth[q].insert(c.id);
         std::cout << "Recall@10 vs brute force over " << queries.size() << " queries:\n";

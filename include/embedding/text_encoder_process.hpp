@@ -5,9 +5,10 @@
 // exit, waits, and escalates to SIGTERM/SIGKILL if it does not.
 #include <filesystem>
 #include <string_view>
-#include <vector>
 
 #include <sys/types.h>
+
+#include "containers/vector.hpp"
 
 #include "embedding/query_encoder.hpp"
 
@@ -39,7 +40,7 @@ public:
     TextEncoderProcess(const TextEncoderProcess&) = delete;
     TextEncoderProcess& operator=(const TextEncoderProcess&) = delete;
 
-    std::vector<float> encode(std::string_view text) override;
+    Vector<float> encode(std::string_view text) override;
 
 private:
     void sendAll(const void* data, std::size_t n);

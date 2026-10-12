@@ -5,7 +5,6 @@
 // With a query on the command line it answers once; otherwise it reads queries from stdin
 // until EOF or an empty line. Text is embedded by the persistent Python CLIP helper; all
 // retrieval, ranking and metadata lookup is C++.
-#include <algorithm>
 #include <iomanip>
 #include <iostream>
 

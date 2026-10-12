@@ -41,7 +41,7 @@ void SearchEngine::checkK(int k) const {
                          std::to_string(index_->size()) + ")");
 }
 
-std::vector<float> SearchEngine::prepareVector(std::span<const float> raw) const {
+Vector<float> SearchEngine::prepareVector(std::span<const float> raw) const {
     if (raw.size() != store_->dim())
         throw QueryError("query embedding dimension mismatch: got " + std::to_string(raw.size()) +
                          ", expected " + std::to_string(store_->dim()));
@@ -50,13 +50,13 @@ std::vector<float> SearchEngine::prepareVector(std::span<const float> raw) const
             throw QueryError(std::string("query embedding contains ") +
                              (std::isnan(raw[i]) ? "NaN" : "Inf") + " at element " +
                              std::to_string(i));
-    std::vector<float> v(raw.begin(), raw.end());
+    Vector<float> v(raw.data(), raw.data() + raw.size());
     if (norm(v) == 0.0) throw QueryError("query embedding has zero norm");
     normalize(v);
     return v;
 }
 
-std::vector<float> SearchEngine::embedQuery(std::string_view text) const {
+Vector<float> SearchEngine::embedQuery(std::string_view text) const {
     const std::string clean = normalizeQueryText(text);
     if (!encoder_) throw QueryError("no text encoder configured for text queries");
     return prepareVector(encoder_->encode(clean));
@@ -66,7 +66,7 @@ SearchResponse SearchEngine::searchEmbedding(std::span<const float> unitQuery, i
     checkK(k);
     SearchResponse resp;
     const auto t0 = std::chrono::steady_clock::now();
-    const std::vector<Candidate> hits = index_->search(unitQuery, k);
+    const Vector<Candidate> hits = index_->search(unitQuery, k);
     resp.retrievalMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     resp.results.reserve(hits.size());
@@ -80,7 +80,7 @@ SearchResponse SearchEngine::searchEmbedding(std::span<const float> unitQuery, i
 
 SearchResponse SearchEngine::search(std::string_view text, int k) const {
     checkK(k);  // fail fast before running the encoder
-    const std::vector<float> q = embedQuery(text);
+    const Vector<float> q = embedQuery(text);
     return searchEmbedding(q, k);
 }
 

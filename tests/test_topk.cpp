@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <random>
-#include <vector>
 
+#include "algorithms/basic.hpp"
+#include "algorithms/sort.hpp"
 #include "similarity/topk.hpp"
 #include "similarity/vector_math.hpp"
 #include "test_helpers.hpp"
@@ -11,9 +11,9 @@
 using namespace sir;
 
 namespace {
-std::vector<Neighbor> fullSort(std::vector<Neighbor> all, std::size_t k) {
-    std::sort(all.begin(), all.end(), closer);
-    all.resize(std::min(k, all.size()));
+Vector<Neighbor> fullSort(Vector<Neighbor> all, std::size_t k) {
+    sortRange(all.begin(), all.end(), closer);
+    all.resize(minOf(k, all.size()));
     return all;
 }
 }  // namespace
@@ -51,12 +51,11 @@ TEST(TopK, MatchesFullSortWithTies_G6) {
         std::uniform_int_distribution<std::size_t> pick(0, N - 1);
         for (int d = 0; d < 50; ++d) {
             const std::size_t src = pick(rng), dst = pick(rng);
-            std::copy_n(data.begin() + static_cast<long>(src * D), D,
-                        data.begin() + static_cast<long>(dst * D));
+            for (std::size_t j = 0; j < D; ++j) data[dst * D + j] = data[src * D + j];
         }
         const auto q = test::randomUnitVectors(1, D, 5000 + static_cast<std::uint64_t>(trial));
         const std::size_t k = 1 + static_cast<std::size_t>(trial % 50);
-        std::vector<Neighbor> all;
+        Vector<Neighbor> all;
         TopK t(k);
         for (std::size_t i = 0; i < N; ++i) {
             const Neighbor n{distance(q, std::span<const float>(data.data() + i * D, D)),

@@ -18,8 +18,9 @@
 #include <random>
 #include <span>
 #include <string>
-#include <vector>
 
+#include "containers/bit_vector.hpp"
+#include "containers/vector.hpp"
 #include "data/config.hpp"
 #include "embedding/embedding_store.hpp"
 #include "index/retrieval_index.hpp"
@@ -35,7 +36,7 @@ public:
     HNSWIndex& operator=(const HNSWIndex&) = delete;
 
     void insert(int id, std::span<const float> embedding) override;
-    std::vector<Candidate> search(std::span<const float> query, int k) const override;
+    Vector<Candidate> search(std::span<const float> query, int k) const override;
     std::size_t size() const override { return count_; }
     std::size_t memoryBytes() const override;
 
@@ -62,10 +63,10 @@ public:
     std::string rngState() const;
     struct NodeData {
         int level = -1;
-        std::vector<std::vector<int>> links;  // links[layer]
+        Vector<Vector<int>> links;  // links[layer]
     };
     static HNSWIndex restore(const EmbeddingStore& store, const HnswParams& params,
-                             std::vector<NodeData> nodes, int entry, int maxLevel,
+                             Vector<NodeData> nodes, int entry, int maxLevel,
                              const std::string& rngState);
 
 private:
@@ -73,13 +74,12 @@ private:
     int randomLevel();
     Neighbor greedyClosest(std::span<const float> q, Neighbor ep, int layer) const;
     // SEARCH-LAYER (paper Alg. 2). Returns up to ef results, closest first.
-    std::vector<Neighbor> searchLayer(std::span<const float> q,
-                                      const std::vector<Neighbor>& entryPoints, int ef,
-                                      int layer) const;
+    Vector<Neighbor> searchLayer(std::span<const float> q, const Vector<Neighbor>& entryPoints,
+                                 int ef, int layer) const;
     // SELECT-NEIGHBORS: naive (M closest) or heuristic (paper Alg. 4, extendCandidates off,
     // keepPrunedConnections configurable). `candidates` must be closest first,
     // with distances measured from the base element.
-    std::vector<Neighbor> selectNeighbors(const std::vector<Neighbor>& candidates, int m) const;
+    Vector<Neighbor> selectNeighbors(const Vector<Neighbor>& candidates, int m) const;
     // Prunes id's list on `layer` back to Mmax. With protectLastInEdge, an edge that is its
     // target's only incoming edge on this layer is kept in place of the farthest kept edge
     // whose target has another incoming edge (an addition of this project, not in the paper).
@@ -93,14 +93,14 @@ private:
     HnswParams params_;
     double mL_;
     std::mt19937_64 rng_;
-    std::vector<NodeData> nodes_;  // indexed by id; level -1 = not inserted
-    std::vector<bool> present_;
-    std::vector<std::vector<std::uint32_t>> inDeg_;  // inDeg_[id][layer]
+    Vector<NodeData> nodes_;  // indexed by id; level -1 = not inserted
+    BitVector present_;
+    Vector<Vector<std::uint32_t>> inDeg_;  // inDeg_[id][layer]
     std::size_t count_ = 0;
     int entry_ = -1;
     int maxLevel_ = -1;
 
-    mutable std::vector<std::uint32_t> visited_;  // visited_[id] == epoch -> visited
+    mutable Vector<std::uint32_t> visited_;  // visited_[id] == epoch -> visited
     mutable std::uint32_t epoch_ = 0;
     mutable std::uint64_t distCount_ = 0;
 };

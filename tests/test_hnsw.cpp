@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <iomanip>
 #include <iostream>
-#include <queue>
-#include <set>
 
+#include "algorithms/basic.hpp"
+#include "containers/bit_vector.hpp"
+#include "containers/flat_set.hpp"
 #include "data/errors.hpp"
 #include "index/brute_force_index.hpp"
 #include "index/hnsw_index.hpp"
@@ -45,7 +45,8 @@ void checkInvariants(const HNSWIndex& h, std::size_t n) {
         for (int l = 0; l <= h.levelOf(id); ++l) {
             const auto nb = h.neighbors(id, l);
             ASSERT_LE(nb.size(), static_cast<std::size_t>(h.maxDegree(l)));
-            std::set<int> uniq(nb.begin(), nb.end());
+            FlatSet<int> uniq;
+            for (int e : nb) uniq.insert(e);
             ASSERT_EQ(uniq.size(), nb.size()) << "duplicate link at node " << id;
             for (int e : nb) {
                 ASSERT_NE(e, id) << "self loop";
@@ -55,7 +56,7 @@ void checkInvariants(const HNSWIndex& h, std::size_t n) {
     }
     // Incremental in-degree bookkeeping must equal a full recount.
     for (int l = 0; l <= h.maxLevel(); ++l) {
-        std::vector<std::uint32_t> cnt(n, 0);
+        Vector<std::uint32_t> cnt(n, 0);
         for (std::size_t i = 0; i < n; ++i)
             if (h.levelOf(static_cast<int>(i)) >= l)
                 for (int e : h.neighbors(static_cast<int>(i), l)) ++cnt[static_cast<std::size_t>(e)];
@@ -63,22 +64,17 @@ void checkInvariants(const HNSWIndex& h, std::size_t n) {
             if (h.levelOf(static_cast<int>(i)) >= l)
                 ASSERT_EQ(cnt[i], h.inDegreeOf(static_cast<int>(i), l)) << "node " << i << " layer " << l;
     }
-    std::vector<bool> seen(n, false);
-    std::queue<int> bfs;
-    bfs.push(h.entryPoint());
-    seen[static_cast<std::size_t>(h.entryPoint())] = true;
-    std::size_t reached = 1;
-    while (!bfs.empty()) {
-        const int c = bfs.front();
-        bfs.pop();
-        for (int e : h.neighbors(c, 0))
+    BitVector seen(n, false);
+    Vector<int> bfs;  // FIFO: read cursor `head`, each node pushed once
+    bfs.push_back(h.entryPoint());
+    seen.set(static_cast<std::size_t>(h.entryPoint()), true);
+    for (std::size_t head = 0; head < bfs.size(); ++head)
+        for (int e : h.neighbors(bfs[head], 0))
             if (!seen[static_cast<std::size_t>(e)]) {
-                seen[static_cast<std::size_t>(e)] = true;
-                ++reached;
-                bfs.push(e);
+                seen.set(static_cast<std::size_t>(e), true);
+                bfs.push_back(e);
             }
-    }
-    EXPECT_EQ(reached, n) << "layer-0 graph is disconnected";
+    EXPECT_EQ(bfs.size(), n) << "layer-0 graph is disconnected";
 }
 
 void expectExactWithHighEf(std::size_t n, std::size_t d, int k, bool heuristic) {
@@ -137,7 +133,7 @@ TEST(HNSW, G8_Recall_N5000) {
             for (int t = 0; t < 200; ++t) {
                 std::span<const float> q(qs.data() + static_cast<std::size_t>(t) * D, D);
                 const auto a = f.bf.search(q, 10), b = f.hnsw.search(q, 10);
-                std::set<int> truth;
+                FlatSet<int> truth;
                 for (auto& c : a) truth.insert(c.id);
                 for (auto& c : b) hits += truth.count(c.id);
             }
@@ -157,15 +153,15 @@ TEST(HNSW, DeterministicForFixedSeed) {
         ASSERT_EQ(a.hnsw.levelOf(i), b.hnsw.levelOf(i));
         for (int l = 0; l <= a.hnsw.levelOf(i); ++l) {
             const auto x = a.hnsw.neighbors(i, l), y = b.hnsw.neighbors(i, l);
-            ASSERT_TRUE(std::equal(x.begin(), x.end(), y.begin(), y.end()));
+            ASSERT_TRUE(equalRanges(x, y));
         }
     }
 }
 
 TEST(HNSW, LevelDistributionFollowsExponentialDecay) {
     Fixture f(5000, 8, params(16, 32, 16, true), 3);
-    std::vector<int> hist(8, 0);
-    for (int i = 0; i < 5000; ++i) ++hist[static_cast<std::size_t>(std::min(f.hnsw.levelOf(i), 7))];
+    Vector<int> hist(8, 0);
+    for (int i = 0; i < 5000; ++i) ++hist[static_cast<std::size_t>(minOf(f.hnsw.levelOf(i), 7))];
     // P(level >= 1) = 1/M = 0.0625 -> expect ~312 of 5000; allow a wide binomial band.
     const int upper = 5000 - hist[0];
     EXPECT_GT(upper, 240);

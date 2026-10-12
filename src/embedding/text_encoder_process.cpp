@@ -64,7 +64,7 @@ TextEncoderProcess::TextEncoderProcess(const std::filesystem::path& python,
     posix_spawn_file_actions_addopen(&fa.a, STDERR_FILENO, logFile.c_str(),
                                      O_WRONLY | O_CREAT | O_APPEND, 0644);
     const std::string py = python.string(), sc = script.string(), cf = config.string();
-    std::vector<char*> argv{const_cast<char*>(py.c_str()), const_cast<char*>(sc.c_str()),
+    Vector<char*> argv{const_cast<char*>(py.c_str()), const_cast<char*>(sc.c_str()),
                             const_cast<char*>(cf.c_str()), nullptr};
     const int rc = ::posix_spawn(&pid_, py.c_str(), &fa.a, nullptr, argv.data(), environ);
     if (rc != 0)
@@ -130,7 +130,7 @@ void TextEncoderProcess::recvAll(void* data, std::size_t n) {
     }
 }
 
-std::vector<float> TextEncoderProcess::encode(std::string_view text) {
+Vector<float> TextEncoderProcess::encode(std::string_view text) {
     if (text.empty()) throw QueryError("query is empty");
     const auto len = static_cast<std::uint32_t>(text.size());
     sendAll(&len, sizeof len);
@@ -145,7 +145,7 @@ std::vector<float> TextEncoderProcess::encode(std::string_view text) {
     if (header != dim_ * sizeof(float))
         throw EmbeddingError("text encoder returned " + std::to_string(header) +
                              " bytes, expected " + std::to_string(dim_ * sizeof(float)));
-    std::vector<float> v(dim_);
+    Vector<float> v(dim_);
     recvAll(v.data(), header);
     return v;
 }

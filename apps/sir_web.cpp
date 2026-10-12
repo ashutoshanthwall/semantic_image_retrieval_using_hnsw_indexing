@@ -62,7 +62,7 @@ int intParam(const httplib::Request& req, const char* name, int def) {
 }
 
 json resultsJson(const SearchResponse& r, const MetadataManager& meta,
-                 const std::set<int>& other) {
+                 const FlatSet<int>& other) {
     json arr = json::array();
     for (const SearchResult& s : r.results) {
         const ImageRecord& rec = meta.at(s.internalId);

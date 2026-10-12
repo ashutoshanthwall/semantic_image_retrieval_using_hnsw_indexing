@@ -3,9 +3,10 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
-#include <queue>
-#include <set>
 
+#include "containers/bit_vector.hpp"
+#include "containers/flat_set.hpp"
+#include "containers/vector.hpp"
 #include "data/errors.hpp"
 #include "persistence/sha256.hpp"
 
@@ -19,26 +20,22 @@ public:
     template <class T>
     void put(const T& v) {
         static_assert(std::is_trivially_copyable_v<T>);
-        const auto* p = reinterpret_cast<const char*>(&v);
-        buf_.insert(buf_.end(), p, p + sizeof(T));
+        buf_.append(reinterpret_cast<const char*>(&v), sizeof(T));
     }
-    void bytes(const void* p, std::size_t n) {
-        const auto* c = static_cast<const char*>(p);
-        buf_.insert(buf_.end(), c, c + n);
-    }
+    void bytes(const void* p, std::size_t n) { buf_.append(static_cast<const char*>(p), n); }
     void str(const std::string& s) {
         put(static_cast<std::uint32_t>(s.size()));
         bytes(s.data(), s.size());
     }
-    std::vector<char>& data() { return buf_; }
+    Vector<char>& data() { return buf_; }
 
 private:
-    std::vector<char> buf_;
+    Vector<char> buf_;
 };
 
 class Reader {
 public:
-    Reader(const std::vector<char>& buf, std::size_t end, std::string file)
+    Reader(const Vector<char>& buf, std::size_t end, std::string file)
         : buf_(buf), end_(end), file_(std::move(file)) {}
     template <class T>
     T get() {
@@ -71,7 +68,7 @@ private:
                                    std::to_string(pos_ + n) + " bytes, have " +
                                    std::to_string(end_) + ")");
     }
-    const std::vector<char>& buf_;
+    const Vector<char>& buf_;
     std::size_t pos_ = 0;
     std::size_t end_;
     std::string file_;
@@ -148,7 +145,7 @@ HNSWIndex IndexManager::load(const std::filesystem::path& path, const EmbeddingS
     if (!std::filesystem::exists(path))
         throw PersistenceError("index file not found: " + f +
                                " (build it with sir_build_index)");
-    std::vector<char> buf(std::filesystem::file_size(path));
+    Vector<char> buf(std::filesystem::file_size(path));
     {
         std::ifstream in(path, std::ios::binary);
         if (!in.read(buf.data(), static_cast<std::streamsize>(buf.size())))
@@ -209,7 +206,7 @@ HNSWIndex IndexManager::load(const std::filesystem::path& path, const EmbeddingS
                                sourceSha.substr(0, 16) + "..., current embeddings are " +
                                store.sourceSha256().substr(0, 16) + "... — rebuild it");
 
-    std::vector<HNSWIndex::NodeData> nodes(rows);
+    Vector<HNSWIndex::NodeData> nodes(rows);
     const int maxDeg0 = 2 * p.M;
     for (std::size_t i = 0; i < rows; ++i) {
         auto& n = nodes[i];
@@ -260,36 +257,35 @@ IndexValidation IndexManager::validate(const HNSWIndex& index) {
             if (nb.size() > static_cast<std::size_t>(index.maxDegree(l)))
                 throw IndexError("node " + std::to_string(id) + " exceeds max degree on layer " +
                                  std::to_string(l));
-            std::set<int> uniq;
+            FlatSet<int> uniq;
             for (int e : nb) {
                 if (e == id) throw IndexError("self loop at node " + std::to_string(id));
                 if (index.levelOf(e) < l)
                     throw IndexError("node " + std::to_string(id) + " links to " +
                                      std::to_string(e) + " which is absent from layer " +
                                      std::to_string(l));
-                if (!uniq.insert(e).second)
+                if (!uniq.insert(e))
                     throw IndexError("duplicate link at node " + std::to_string(id));
             }
             if (l == 0) degSum += nb.size();
         }
     }
     v.meanDegreeLayer0 = static_cast<double>(degSum) / static_cast<double>(v.nodes);
-    std::vector<bool> seen(n, false);
-    std::queue<int> q;
-    q.push(index.entryPoint());
-    seen[static_cast<std::size_t>(index.entryPoint())] = true;
-    v.reachableLayer0 = 1;
-    while (!q.empty()) {
-        const int c = q.front();
-        q.pop();
-        for (int e : index.neighbors(c, 0))
+    // Breadth-first search on layer 0. Each node enters the queue once, so a plain array
+    // with a read cursor serves as the FIFO queue.
+    BitVector seen(n, false);
+    Vector<int> queue;
+    queue.reserve(n);
+    queue.push_back(index.entryPoint());
+    seen.set(static_cast<std::size_t>(index.entryPoint()), true);
+    for (std::size_t head = 0; head < queue.size(); ++head)
+        for (int e : index.neighbors(queue[head], 0))
             if (!seen[static_cast<std::size_t>(e)]) {
-                seen[static_cast<std::size_t>(e)] = true;
-                ++v.reachableLayer0;
-                q.push(e);
+                seen.set(static_cast<std::size_t>(e), true);
+                queue.push_back(e);
             }
-    }
-    std::vector<std::uint32_t> inDeg(n, 0);
+    v.reachableLayer0 = queue.size();
+    Vector<std::uint32_t> inDeg(n, 0);
     for (std::size_t i = 0; i < n; ++i)
         if (index.contains(static_cast<int>(i)))
             for (int e : index.neighbors(static_cast<int>(i), 0)) ++inDeg[static_cast<std::size_t>(e)];

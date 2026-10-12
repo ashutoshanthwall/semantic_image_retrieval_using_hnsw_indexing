@@ -7,7 +7,7 @@
 
 namespace sir {
 
-MetadataManager::MetadataManager(std::vector<ImageRecord> records)
+MetadataManager::MetadataManager(Vector<ImageRecord> records)
     : records_(std::move(records)) {
     for (std::size_t i = 0; i < records_.size(); ++i)
         if (records_[i].internalId != static_cast<int>(i))
@@ -22,7 +22,7 @@ MetadataManager MetadataManager::load(const std::filesystem::path& metadataJson,
     nlohmann::json j;
     try {
         j = nlohmann::json::parse(in);
-        std::vector<ImageRecord> recs;
+        Vector<ImageRecord> recs;
         const auto& arr = j.at("records");
         recs.reserve(arr.size());
         for (const auto& r : arr) {
@@ -33,7 +33,12 @@ MetadataManager MetadataManager::load(const std::filesystem::path& metadataJson,
             rec.width = r.at("width").get<int>();
             rec.height = r.at("height").get<int>();
             rec.split = r.value("split", "");
-            rec.captions = r.at("captions").get<std::vector<std::string>>();
+            const auto& caps = r.at("captions");
+            if (!caps.is_array())
+                throw DataError("captions of record " + std::to_string(rec.internalId) +
+                                " is not an array");
+            rec.captions.reserve(caps.size());
+            for (const auto& c : caps) rec.captions.push_back(c.get<std::string>());
             recs.push_back(std::move(rec));
         }
         if (j.at("count").get<std::size_t>() != recs.size())

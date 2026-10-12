@@ -5,7 +5,8 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
-#include <vector>
+
+#include "containers/vector.hpp"
 
 namespace sir {
 
@@ -16,20 +17,20 @@ struct ImageRecord {
     int width = 0;
     int height = 0;
     std::string split;
-    std::vector<std::string> captions;
+    Vector<std::string> captions;
 };
 
 class MetadataManager {
 public:
     static MetadataManager load(const std::filesystem::path& metadataJson,
                                 const std::filesystem::path& root);
-    explicit MetadataManager(std::vector<ImageRecord> records);
+    explicit MetadataManager(Vector<ImageRecord> records);
 
     const ImageRecord& at(int internalId) const;  // throws DataError when out of range
     std::size_t size() const noexcept { return records_.size(); }
 
 private:
-    std::vector<ImageRecord> records_;
+    Vector<ImageRecord> records_;
 };
 
 }  // namespace sir

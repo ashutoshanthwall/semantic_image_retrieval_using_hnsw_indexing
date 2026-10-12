@@ -76,9 +76,10 @@ index persistence and validation; benchmarking; the search pipeline; the CLI.
 | Component | Implemented here | Library facility used |
 |---|---|---|
 | Dot product, norm, normalisation, distance convention | ✔ (`similarity/vector_math`) | — |
-| Bounded top-K selection (O(N log K), total `(dist, id)` order) | ✔ heap logic and comparators | `std::priority_queue` as the container |
+| Containers and algorithms: `Vector` (growable array), `BinaryHeap`, `BitVector`, `FlatSet` / `FlatMap` (sorted arrays + binary search), `FixedArray`, introsort (quicksort + heap-sort fallback + insertion sort) | ✔ (`include/containers/`, `include/algorithms/`); no STL containers or `<algorithm>` anywhere in the C++ code | `::operator new` / placement new for raw storage |
+| Bounded top-K selection (O(N log K), total `(dist, id)` order) | ✔ heap and comparators | — |
 | Brute-force search | ✔ | — |
-| HNSW: level assignment, greedy descent, SEARCH-LAYER with candidate min-heap + result max-heap, bidirectional linking, pruning, naive and heuristic neighbour selection, keepPrunedConnections, last-in-edge protection, visited-epoch markers | ✔ entirely | `std::priority_queue`, `std::vector`, `std::mt19937_64` (raw bits only; the uniform→level mapping is mine) |
+| HNSW: level assignment, greedy descent, SEARCH-LAYER with candidate min-heap + result max-heap, bidirectional linking, pruning, naive and heuristic neighbour selection, keepPrunedConnections, last-in-edge protection, visited-epoch markers | ✔ entirely | `std::mt19937_64` (raw bits only; the uniform→level mapping is mine) |
 | Index file format, stale/corruption detection, graph validation (degrees, self-loops, layer consistency, BFS reachability) | ✔ | — |
 | SHA-256 (index checksums, embedding-file identity) | ✔ standard FIPS 180-4, tested against NIST vectors | — |
 | Search orchestration, query validation, RAII subprocess | ✔ | POSIX `posix_spawn`, `socketpair` |
@@ -185,7 +186,7 @@ the weights were trained with, and the manifest records this.
 | Object | Owns | Referenced by |
 |---|---|---|
 | `MetadataManager` | all `ImageRecord`s | `SearchEngine` |
-| `EmbeddingStore` | one contiguous `std::vector<float>` [N × D] | both indexes, `SearchEngine` (via `std::span`) |
+| `EmbeddingStore` | one contiguous `Vector<float>` [N × D] | both indexes, `SearchEngine` (via `std::span`) |
 | `BruteForceIndex` | a vector of ids | `SearchEngine` through `RetrievalIndex&` |
 | `HNSWIndex` | node levels, adjacency lists, in-degrees, visited markers | `SearchEngine` through `RetrievalIndex&` |
 | `SearchEngine` | nothing (non-owning pointers) | the apps |
@@ -316,7 +317,7 @@ Each of these is tested:
 | **G10** Persistence | Build → save → load in a fresh process → 50 queries: **500/500 results identical** (ids and score bits). One flipped byte (offset 1,781,378: 0x15 → 0xea): rejected, "index file is corrupted (SHA-256 checksum mismatch)". Truncated and missing files are also rejected. |
 | **G11** End to end | `sir_cli a dog playing in snow` returns 5 existing paths, identical for both backends, which are the same 5 dog-in-snow images viewed at G4. |
 
-Plus: 32 GoogleTest tests (`ctest`), and the Python robustness tests (13 checks).
+Plus: 48 GoogleTest tests (`ctest`), 16 of them for the hand-written containers and sort, and the Python robustness tests (13 checks).
 
 ---
 
@@ -642,6 +643,7 @@ Useful flags:
 ```
 config/config.json          every tunable (model, dim, paths, HNSW, evaluation, seeds)
 include/, src/
+  containers/, algorithms/  hand-written Vector, BinaryHeap, BitVector, FlatSet, FlatMap, FixedArray, sort
   data/                     config, metadata, error types
   embedding/                manifest, EmbeddingStore, QueryEncoder, TextEncoderProcess
   similarity/               vector math, top-K
@@ -651,7 +653,7 @@ include/, src/
   benchmark/                latency stats, recall metrics, system info
 apps/                       sir_cli, sir_web, sir_benchmark, sir_build_index, sir_gate (+ compare.hpp shared by cli/web)
 web/                        index.html (the web UI page)
-tests/                      GoogleTest suites (math, top-K, SHA, store, metadata, BF, HNSW, persistence, engine)
+tests/                      GoogleTest suites (containers + sort, math, top-K, SHA, store, metadata, BF, HNSW, persistence, engine)
 scripts/                    Python pipeline, gate scripts, helper server, plots, run_all.sh
 data/raw/                   read-only after download (git-ignored)
 data/processed/, data/embeddings/   derived data (large files git-ignored; manifests/reports committed)

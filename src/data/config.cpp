@@ -36,7 +36,11 @@ AppConfig loadConfig(const std::filesystem::path& configFile) {
         c.evaluation.seed = e.at("seed").get<std::uint64_t>();
         c.evaluation.warmupQueries = e.at("warmup_queries").get<int>();
         c.evaluation.repetitions = e.at("repetitions").get<int>();
-        c.evaluation.efSearchSweep = e.at("ef_search_sweep").get<std::vector<int>>();
+        const auto& sweep = e.at("ef_search_sweep");
+        if (!sweep.is_array())
+            throw ConfigError("evaluation.ef_search_sweep in " + configFile.string() +
+                              " must be an array");
+        for (const auto& ef : sweep) c.evaluation.efSearchSweep.push_back(ef.get<int>());
         const auto& p = j.at("paths");
         auto path = [&](const char* key) { return c.root / p.at(key).get<std::string>(); };
         c.metadata = path("metadata");

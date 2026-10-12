@@ -1,9 +1,10 @@
 #include "index/hnsw_index.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <sstream>
 
+#include "algorithms/basic.hpp"
+#include "algorithms/sort.hpp"
 #include "data/errors.hpp"
 #include "index/brute_force_index.hpp"  // checkInsert
 #include "similarity/vector_math.hpp"
@@ -45,7 +46,7 @@ int HNSWIndex::randomLevel() {
 
 void HNSWIndex::nextVisitEpoch() const {
     if (++epoch_ == 0) {  // wrapped: clear markers once every 2^32 searches
-        std::fill(visited_.begin(), visited_.end(), 0u);
+        for (std::uint32_t& mark : visited_) mark = 0;
         epoch_ = 1;
     }
 }
@@ -68,9 +69,9 @@ Neighbor HNSWIndex::greedyClosest(std::span<const float> q, Neighbor ep, int lay
     return ep;
 }
 
-std::vector<Neighbor> HNSWIndex::searchLayer(std::span<const float> q,
-                                             const std::vector<Neighbor>& entryPoints, int ef,
-                                             int layer) const {
+Vector<Neighbor> HNSWIndex::searchLayer(std::span<const float> q,
+                                        const Vector<Neighbor>& entryPoints, int ef,
+                                        int layer) const {
     nextVisitEpoch();
     MinDistHeap candidates;  // C: closest on top — next node to expand
     MaxDistHeap results;     // W: farthest on top — the current worst of the best ef
@@ -97,7 +98,7 @@ std::vector<Neighbor> HNSWIndex::searchLayer(std::span<const float> q,
             }
         }
     }
-    std::vector<Neighbor> out(results.size());
+    Vector<Neighbor> out(results.size());
     for (std::size_t i = out.size(); i-- > 0;) {  // max-heap pops farthest first
         out[i] = results.top();
         results.pop();
@@ -105,18 +106,17 @@ std::vector<Neighbor> HNSWIndex::searchLayer(std::span<const float> q,
     return out;
 }
 
-std::vector<Neighbor> HNSWIndex::selectNeighbors(const std::vector<Neighbor>& candidates,
-                                                 int m) const {
+Vector<Neighbor> HNSWIndex::selectNeighbors(const Vector<Neighbor>& candidates, int m) const {
     const auto limit = static_cast<std::size_t>(m);
     if (!params_.selectHeuristic)  // naive: the m closest
-        return {candidates.begin(),
-                candidates.begin() + static_cast<long>(std::min(limit, candidates.size()))};
+        return Vector<Neighbor>(candidates.begin(),
+                                candidates.begin() + minOf(limit, candidates.size()));
     // Heuristic: walk candidates closest-first; keep e only if it is closer to the base
     // element than to every neighbour already kept. This favours neighbours in
     // different directions, which preserves long-range connectivity between clusters.
     // As in the paper (and unlike hnswlib's early return), it is applied even when there
     // are fewer than m candidates.
-    std::vector<Neighbor> kept, discarded;
+    Vector<Neighbor> kept, discarded;
     kept.reserve(limit);
     for (const Neighbor& e : candidates) {
         if (kept.size() >= limit) break;
@@ -144,13 +144,15 @@ std::vector<Neighbor> HNSWIndex::selectNeighbors(const std::vector<Neighbor>& ca
 void HNSWIndex::shrinkNeighbors(int id, int layer) {
     auto& links = nodes_[static_cast<std::size_t>(id)].links[static_cast<std::size_t>(layer)];
     const auto base = store_->row(static_cast<std::size_t>(id));
-    std::vector<Neighbor> cands;
+    Vector<Neighbor> cands;
     cands.reserve(links.size());
     for (int e : links) cands.push_back({dist(base, e), e});
-    std::sort(cands.begin(), cands.end(), closer);
-    std::vector<Neighbor> kept = selectNeighbors(cands, maxDegree(layer));
+    sortRange(cands.begin(), cands.end(), closer);
+    Vector<Neighbor> kept = selectNeighbors(cands, maxDegree(layer));
     auto isKept = [&kept](int x) {
-        return std::any_of(kept.begin(), kept.end(), [x](const Neighbor& n) { return n.id == x; });
+        for (const Neighbor& n : kept)
+            if (n.id == x) return true;
+        return false;
     };
     if (params_.protectLastInEdge) {
         for (const Neighbor& c : cands) {  // closest first: deterministic
@@ -160,13 +162,13 @@ void HNSWIndex::shrinkNeighbors(int id, int layer) {
                 kept.push_back(c);
                 continue;
             }
-            for (auto it = kept.rbegin(); it != kept.rend(); ++it)
-                if (inDegree(it->id, layer) > 1) {  // its target keeps another in-edge
-                    *it = c;
+            for (std::size_t i = kept.size(); i-- > 0;)  // farthest kept edge first
+                if (inDegree(kept[i].id, layer) > 1) {  // its target keeps another in-edge
+                    kept[i] = c;
                     break;
                 }
         }
-        std::sort(kept.begin(), kept.end(), closer);
+        sortRange(kept.begin(), kept.end(), closer);
     }
     for (int e : links)
         if (!isKept(e)) --inDegree(e, layer);
@@ -184,7 +186,7 @@ void HNSWIndex::insert(int id, std::span<const float> embedding) {
     for (int l = 0; l <= level; ++l)
         node.links[static_cast<std::size_t>(l)].reserve(static_cast<std::size_t>(maxDegree(l)) + 1);
     inDeg_[static_cast<std::size_t>(id)].assign(static_cast<std::size_t>(level) + 1, 0);
-    present_[static_cast<std::size_t>(id)] = true;
+    present_.set(static_cast<std::size_t>(id), true);
     ++count_;
 
     if (entry_ < 0) {
@@ -196,10 +198,10 @@ void HNSWIndex::insert(int id, std::span<const float> embedding) {
     Neighbor ep{dist(q, entry_), entry_};
     for (int lc = maxLevel_; lc > level; --lc) ep = greedyClosest(q, ep, lc);
 
-    std::vector<Neighbor> entryPoints{ep};
-    for (int lc = std::min(level, maxLevel_); lc >= 0; --lc) {
-        std::vector<Neighbor> w = searchLayer(q, entryPoints, params_.efConstruction, lc);
-        const std::vector<Neighbor> chosen = selectNeighbors(w, params_.M);
+    Vector<Neighbor> entryPoints{ep};
+    for (int lc = minOf(level, maxLevel_); lc >= 0; --lc) {
+        Vector<Neighbor> w = searchLayer(q, entryPoints, params_.efConstruction, lc);
+        const Vector<Neighbor> chosen = selectNeighbors(w, params_.M);
         auto& mine = node.links[static_cast<std::size_t>(lc)];
         for (const Neighbor& n : chosen) {
             mine.push_back(n.id);
@@ -219,11 +221,11 @@ void HNSWIndex::insert(int id, std::span<const float> embedding) {
     }
 }
 
-std::vector<Candidate> HNSWIndex::search(std::span<const float> query, int k) const {
+Vector<Candidate> HNSWIndex::search(std::span<const float> query, int k) const {
     checkSearchArgs(query, k, store_->dim(), count_);
     Neighbor ep{dist(query, entry_), entry_};
     for (int lc = maxLevel_; lc > 0; --lc) ep = greedyClosest(query, ep, lc);
-    std::vector<Neighbor> w = searchLayer(query, {ep}, std::max(params_.efSearch, k), 0);
+    Vector<Neighbor> w = searchLayer(query, {ep}, maxOf(params_.efSearch, k), 0);
     if (w.size() > static_cast<std::size_t>(k)) w.resize(static_cast<std::size_t>(k));
     return toCandidates(w);
 }
@@ -247,10 +249,10 @@ std::span<const int> HNSWIndex::neighbors(int id, int layer) const {
 std::size_t HNSWIndex::memoryBytes() const {
     std::size_t bytes = nodes_.capacity() * sizeof(NodeData) + present_.capacity() / 8 +
                         visited_.capacity() * sizeof(std::uint32_t) +
-                        inDeg_.capacity() * sizeof(std::vector<std::uint32_t>);
+                        inDeg_.capacity() * sizeof(Vector<std::uint32_t>);
     for (const auto& d : inDeg_) bytes += d.capacity() * sizeof(std::uint32_t);
     for (const NodeData& n : nodes_) {
-        bytes += n.links.capacity() * sizeof(std::vector<int>);
+        bytes += n.links.capacity() * sizeof(Vector<int>);
         for (const auto& l : n.links) bytes += l.capacity() * sizeof(int);
     }
     return bytes;
@@ -263,7 +265,7 @@ std::string HNSWIndex::rngState() const {
 }
 
 HNSWIndex HNSWIndex::restore(const EmbeddingStore& store, const HnswParams& params,
-                             std::vector<NodeData> nodes, int entry, int maxLevel,
+                             Vector<NodeData> nodes, int entry, int maxLevel,
                              const std::string& rngState) {
     HNSWIndex idx(store, params);
     if (nodes.size() != store.size())
@@ -271,7 +273,7 @@ HNSWIndex HNSWIndex::restore(const EmbeddingStore& store, const HnswParams& para
     idx.nodes_ = std::move(nodes);
     for (std::size_t i = 0; i < idx.nodes_.size(); ++i) {
         if (idx.nodes_[i].level >= 0) {
-            idx.present_[i] = true;
+            idx.present_.set(i, true);
             ++idx.count_;
             idx.inDeg_[i].assign(static_cast<std::size_t>(idx.nodes_[i].level) + 1, 0);
         }

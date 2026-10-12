@@ -7,8 +7,9 @@
 // near-duplicate images, so exact distance ties happen; the id tie-break makes results
 // identical across backends and runs.
 #include <cstddef>
-#include <queue>
-#include <vector>
+
+#include "containers/binary_heap.hpp"
+#include "containers/vector.hpp"
 
 namespace sir {
 
@@ -22,7 +23,7 @@ inline bool closer(const Neighbor& a, const Neighbor& b) noexcept {
     return a.dist < b.dist || (a.dist == b.dist && a.id < b.id);
 }
 
-// std::priority_queue puts the "largest" element on top. With `closer` as the
+// BinaryHeap puts the highest-ranked element on top. With `closer` as the ranking
 // less-than, the top is the farthest element: a result max-heap.
 struct FarthestOnTop {
     bool operator()(const Neighbor& a, const Neighbor& b) const noexcept { return closer(a, b); }
@@ -32,8 +33,8 @@ struct ClosestOnTop {
     bool operator()(const Neighbor& a, const Neighbor& b) const noexcept { return closer(b, a); }
 };
 
-using MaxDistHeap = std::priority_queue<Neighbor, std::vector<Neighbor>, FarthestOnTop>;
-using MinDistHeap = std::priority_queue<Neighbor, std::vector<Neighbor>, ClosestOnTop>;
+using MaxDistHeap = BinaryHeap<Neighbor, FarthestOnTop>;
+using MinDistHeap = BinaryHeap<Neighbor, ClosestOnTop>;
 
 class TopK {
 public:
@@ -44,7 +45,7 @@ public:
     std::size_t size() const noexcept { return heap_.size(); }
     std::size_t capacity() const noexcept { return k_; }
     // Closest first. Consumes the heap.
-    std::vector<Neighbor> extractSorted();
+    Vector<Neighbor> extractSorted();
 
 private:
     std::size_t k_;

@@ -5,12 +5,13 @@
 #include <ctime>
 #include <fstream>
 #include <memory>
-#include <set>
 #include <sstream>
 #include <thread>
 
 #include <sched.h>
 #include <sys/utsname.h>
+
+#include "containers/flat_set.hpp"
 
 #ifndef SIR_CXX_FLAGS
 #define SIR_CXX_FLAGS "unknown"
@@ -66,7 +67,7 @@ SystemInfo collectSystemInfo(const std::filesystem::path& repoRoot) {
     SystemInfo s;
     std::ifstream cpu("/proc/cpuinfo");
     std::string line;
-    std::set<std::string> cores;
+    FlatSet<std::string> cores;
     std::string physId;
     while (std::getline(cpu, line)) {
         const auto colon = line.find(':');

@@ -10,7 +10,7 @@ using namespace sir;
 
 TEST(EmbeddingStore, RowsAreViewsIntoOwnedBuffer) {
     auto v = test::randomUnitVectors(10, 8, 1);
-    const std::vector<float> copy = v;
+    const Vector<float> copy = v;
     EmbeddingStore s(8, std::move(v), 1e-5);
     EXPECT_EQ(s.size(), 10u);
     EXPECT_EQ(s.dim(), 8u);
@@ -33,12 +33,12 @@ TEST(EmbeddingStore, RejectsInvalidRowsNamingTheRow) {
     }
     EXPECT_THROW(EmbeddingStore(4, make(std::numeric_limits<float>::infinity(), 1), 1e-5),
                  EmbeddingError);
-    std::vector<float> zero(8, 0.0f);
+    Vector<float> zero(8, 0.0f);
     EXPECT_THROW(EmbeddingStore(4, zero, 1e-5), EmbeddingError);
     auto unnorm = test::randomUnitVectors(2, 4, 3);
     unnorm[0] *= 1.01f;
     EXPECT_THROW(EmbeddingStore(4, unnorm, 1e-5), EmbeddingError);
-    EXPECT_THROW(EmbeddingStore(4, std::vector<float>(7, 0.5f), 1e-5), EmbeddingError);
+    EXPECT_THROW(EmbeddingStore(4, Vector<float>(7, 0.5f), 1e-5), EmbeddingError);
 }
 
 TEST(EmbeddingStore, ValidateVectorDimensionMismatch) {

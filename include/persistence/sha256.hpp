@@ -2,11 +2,12 @@
 // SHA-256 (FIPS 180-4), implemented here to verify that an index was built from the exact
 // embedding file named in its header, and to checksum index payloads. Tested against the
 // NIST example vectors.
-#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <span>
 #include <string>
+
+#include "containers/fixed_array.hpp"
 
 namespace sir {
 
@@ -15,12 +16,12 @@ public:
     Sha256();
     void update(std::span<const std::uint8_t> data);
     void update(const void* data, std::size_t n);
-    std::array<std::uint8_t, 32> finish();
+    FixedArray<std::uint8_t, 32> finish();
 
 private:
     void block(const std::uint8_t* p);
-    std::array<std::uint32_t, 8> h_;
-    std::array<std::uint8_t, 64> buf_{};
+    FixedArray<std::uint32_t, 8> h_;
+    FixedArray<std::uint8_t, 64> buf_{};
     std::size_t bufLen_ = 0;
     std::uint64_t totalBytes_ = 0;
 };

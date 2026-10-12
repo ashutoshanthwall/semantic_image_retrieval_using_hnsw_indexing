@@ -1,14 +1,8 @@
 #include "similarity/topk.hpp"
 
-#include <algorithm>
-
 namespace sir {
 
-TopK::TopK(std::size_t k) : k_(k) {
-    std::vector<Neighbor> storage;
-    storage.reserve(k + 1);
-    heap_ = MaxDistHeap(FarthestOnTop{}, std::move(storage));
-}
+TopK::TopK(std::size_t k) : k_(k) { heap_.reserve(k + 1); }
 
 void TopK::push(Neighbor n) {
     if (k_ == 0) return;
@@ -20,14 +14,12 @@ void TopK::push(Neighbor n) {
     }
 }
 
-std::vector<Neighbor> TopK::extractSorted() {
-    std::vector<Neighbor> out;
-    out.reserve(heap_.size());
-    while (!heap_.empty()) {  // pops farthest first
-        out.push_back(heap_.top());
+Vector<Neighbor> TopK::extractSorted() {
+    Vector<Neighbor> out(heap_.size());
+    for (std::size_t i = out.size(); i-- > 0;) {  // pops farthest first
+        out[i] = heap_.top();
         heap_.pop();
     }
-    std::reverse(out.begin(), out.end());
     return out;
 }
 

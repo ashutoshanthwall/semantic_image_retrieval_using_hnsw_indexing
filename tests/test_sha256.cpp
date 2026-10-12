@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "algorithms/basic.hpp"
 #include "persistence/sha256.hpp"
 
 using namespace sir;
@@ -24,7 +25,7 @@ TEST(Sha256, IncrementalEqualsOneShot) {
     for (std::size_t i = 0; i < s.size(); ++i) s[i] = static_cast<char>(i * 7);
     Sha256 h;
     for (std::size_t off = 0; off < s.size(); off += 37)
-        h.update(s.data() + off, std::min<std::size_t>(37, s.size() - off));
+        h.update(s.data() + off, minOf<std::size_t>(37, s.size() - off));
     const auto d = h.finish();
     EXPECT_EQ(toHex(d), sha256Hex(s.data(), s.size()));
 }

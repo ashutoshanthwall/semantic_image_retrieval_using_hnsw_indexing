@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
-#include <vector>
+
+#include "containers/vector.hpp"
 
 namespace sir {
 
@@ -22,7 +23,7 @@ struct EvaluationParams {
     std::uint64_t seed = 0;
     int warmupQueries = 20;
     int repetitions = 5;
-    std::vector<int> efSearchSweep;
+    Vector<int> efSearchSweep;
 };
 
 struct AppConfig {

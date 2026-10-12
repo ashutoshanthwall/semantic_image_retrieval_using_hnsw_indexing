@@ -23,6 +23,7 @@
 
 #include "app_common.hpp"
 #include "benchmark/latency.hpp"
+#include "algorithms/basic.hpp"
 #include "benchmark/system_info.hpp"
 #include "data/errors.hpp"
 #include "embedding/text_encoder_process.hpp"
@@ -50,12 +51,12 @@ struct Row {
     double r1 = 0, r5 = 0, r10 = 0;  // quality track
 };
 
-std::vector<int> loadGroundTruth(const std::filesystem::path& csv) {
+Vector<int> loadGroundTruth(const std::filesystem::path& csv) {
     std::ifstream in(csv);
     if (!in) throw DataError("cannot open " + csv.string());
     std::string line;
     std::getline(in, line);  // header
-    std::vector<int> gt;
+    Vector<int> gt;
     while (std::getline(in, line)) {
         std::stringstream ss(line);
         std::string idx, kind, imageId, internalId;
@@ -68,16 +69,15 @@ std::vector<int> loadGroundTruth(const std::filesystem::path& csv) {
     return gt;
 }
 
-std::vector<std::string> loadQueryTexts(const std::filesystem::path& txt) {
+Vector<std::string> loadQueryTexts(const std::filesystem::path& txt) {
     std::ifstream in(txt);
-    std::vector<std::string> q;
+    Vector<std::string> q;
     for (std::string line; std::getline(in, line);)
         if (!line.empty()) q.push_back(line);
     return q;
 }
 
-void qualityInto(Row& row, const std::vector<std::vector<Candidate>>& res,
-                 const std::vector<int>& gt) {
+void qualityInto(Row& row, const Vector<Vector<Candidate>>& res, const Vector<int>& gt) {
     std::size_t n = 0, h1 = 0, h5 = 0, h10 = 0;
     for (std::size_t q = 0; q < res.size(); ++q) {
         if (gt[q] < 0) continue;  // hand-written queries have no ground truth
@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
 
         const EmbeddingStore store = app::loadImageStore(cfg);
         const EmbeddingStore queries = app::loadQueryStore(cfg);
-        const std::vector<int> gt = loadGroundTruth(cfg.queryGroundTruth);
+        const Vector<int> gt = loadGroundTruth(cfg.queryGroundTruth);
         if (gt.size() != queries.size())
             throw DataError("query ground truth has " + std::to_string(gt.size()) +
                             " rows but there are " + std::to_string(queries.size()) + " queries");
@@ -141,13 +141,13 @@ int main(int argc, char** argv) {
                   << ", K " << K << "\n";
 
         // ---------------------------------------------------------------- brute force
-        std::vector<Row> rows;
+        Vector<Row> rows;
         BruteForceIndex bf(store);
         const auto tb = std::chrono::steady_clock::now();
         bf.insertAll();
         const double bfBuild =
             std::chrono::duration<double>(std::chrono::steady_clock::now() - tb).count();
-        std::vector<std::vector<Candidate>> exact(queries.size());
+        Vector<Vector<Candidate>> exact(queries.size());
         for (std::size_t q = 0; q < queries.size(); ++q) exact[q] = bf.search(queries.row(q), K);
         Row bfRow;
         bfRow.backend = "brute_force";
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
                   << " ms | R@1 " << fmt(bfRow.r1, 4) << "\n";
 
         // ---------------------------------------------------------------- HNSW
-        std::vector<Variant> variants;
+        Vector<Variant> variants;
         HnswParams base = cfg.hnsw;
         base.selectHeuristic = true;
         base.keepPrunedConnections = true;
@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
                 r.backend = "hnsw";
                 r.variant = v.name;
                 r.efSearch = ef;
-                std::vector<std::vector<Candidate>> approx(queries.size());
+                Vector<Vector<Candidate>> approx(queries.size());
                 h.resetDistanceComputations();
                 double s5 = 0, s10 = 0, perfect = 0;
                 for (std::size_t q = 0; q < queries.size(); ++q) {
@@ -229,8 +229,8 @@ int main(int argc, char** argv) {
             TextEncoderProcess& te = *encoder;
             const auto texts = loadQueryTexts(cfg.queries);
             for (int w = 0; w < 5; ++w) te.encode(texts[static_cast<std::size_t>(w)]);
-            std::vector<double> ms;
-            for (std::size_t i = 0; i < std::min<std::size_t>(100, texts.size()); ++i) {
+            Vector<double> ms;
+            for (std::size_t i = 0; i < minOf<std::size_t>(100, texts.size()); ++i) {
                 const auto t0 = std::chrono::steady_clock::now();
                 te.encode(texts[i]);
                 ms.push_back(std::chrono::duration<double, std::milli>(

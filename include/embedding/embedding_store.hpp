@@ -6,8 +6,8 @@
 #include <filesystem>
 #include <span>
 #include <string>
-#include <vector>
 
+#include "containers/vector.hpp"
 #include "embedding/manifest.hpp"
 
 namespace sir {
@@ -15,7 +15,7 @@ namespace sir {
 class EmbeddingStore {
 public:
     // Takes ownership of `data` (size must be a multiple of dim) and validates every row.
-    EmbeddingStore(std::size_t dim, std::vector<float> data, double normTolerance,
+    EmbeddingStore(std::size_t dim, Vector<float> data, double normTolerance,
                    std::string sourceSha256 = {});
 
     // Reads a raw little-endian float32 file and validates it against its manifest and the
@@ -44,7 +44,7 @@ private:
 
     std::size_t dim_ = 0;
     std::size_t rows_ = 0;
-    std::vector<float> data_;
+    Vector<float> data_;
     std::string sha256_;
 };
 

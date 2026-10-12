@@ -21,8 +21,8 @@
 // header that does not match the current embeddings (model, dim, row count, source hash).
 #include <filesystem>
 #include <string>
-#include <vector>
 
+#include "containers/vector.hpp"
 #include "data/config.hpp"
 #include "embedding/embedding_store.hpp"
 #include "index/hnsw_index.hpp"
@@ -34,8 +34,8 @@ struct IndexValidation {
     std::size_t reachableLayer0 = 0;
     int maxLevel = -1;
     double meanDegreeLayer0 = 0.0;
-    std::vector<std::size_t> nodesPerLevel;
-    std::vector<int> unreachableLayer0;  // present nodes with no layer-0 path from the entry
+    Vector<std::size_t> nodesPerLevel;
+    Vector<int> unreachableLayer0;  // present nodes with no layer-0 path from the entry
     std::size_t inDegreeZeroLayer0 = 0;  // nodes that no other node links to on layer 0
 };
 

@@ -10,8 +10,8 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <vector>
 
+#include "containers/vector.hpp"
 #include "data/metadata_manager.hpp"
 #include "embedding/embedding_store.hpp"
 #include "embedding/query_encoder.hpp"
@@ -28,7 +28,7 @@ struct SearchResult {
 };
 
 struct SearchResponse {
-    std::vector<SearchResult> results;
+    Vector<SearchResult> results;
     double retrievalMs = 0.0;  // RetrievalIndex::search only
 };
 
@@ -42,8 +42,8 @@ public:
     // Validates K against the index before any expensive work.
     void checkK(int k) const;
     // Text -> unit-norm query vector (validated: dimension, NaN/Inf, zero norm).
-    std::vector<float> embedQuery(std::string_view text) const;
-    std::vector<float> prepareVector(std::span<const float> raw) const;
+    Vector<float> embedQuery(std::string_view text) const;
+    Vector<float> prepareVector(std::span<const float> raw) const;
 
     SearchResponse search(std::string_view text, int k) const;
     SearchResponse searchEmbedding(std::span<const float> unitQuery, int k) const;

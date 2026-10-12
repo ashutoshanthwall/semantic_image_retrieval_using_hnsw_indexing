@@ -3,10 +3,10 @@
 // artefacts (config, metadata, embeddings, query embeddings) with validation.
 #include <cstdlib>
 #include <iostream>
-#include <map>
 #include <string>
-#include <vector>
 
+#include "containers/flat_map.hpp"
+#include "containers/vector.hpp"
 #include "data/config.hpp"
 #include "data/metadata_manager.hpp"
 #include "embedding/embedding_store.hpp"
@@ -14,20 +14,20 @@
 namespace sir::app {
 
 struct Args {
-    std::vector<std::string> positional;
-    std::map<std::string, std::string> options;  // --key value  or  --flag (value "1")
-    bool has(const std::string& k) const { return options.count(k) != 0; }
+    Vector<std::string> positional;
+    FlatMap<std::string, std::string> options;  // --key value  or  --flag (value "1")
+    bool has(const std::string& k) const { return options.contains(k); }
     std::string get(const std::string& k, const std::string& def) const {
-        auto it = options.find(k);
-        return it == options.end() ? def : it->second;
+        const std::string* v = options.find(k);
+        return v ? *v : def;
     }
     int getInt(const std::string& k, int def) const {
-        auto it = options.find(k);
-        return it == options.end() ? def : std::stoi(it->second);
+        const std::string* v = options.find(k);
+        return v ? std::stoi(*v) : def;
     }
 };
 
-inline Args parseArgs(int argc, char** argv, const std::vector<std::string>& flags = {}) {
+inline Args parseArgs(int argc, char** argv, const Vector<std::string>& flags = {}) {
     Args a;
     for (int i = 1; i < argc; ++i) {
         std::string s = argv[i];

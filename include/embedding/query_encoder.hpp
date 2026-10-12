@@ -1,6 +1,7 @@
 #pragma once
 #include <string_view>
-#include <vector>
+
+#include "containers/vector.hpp"
 
 namespace sir {
 
@@ -8,7 +9,7 @@ namespace sir {
 // validates and normalises whatever comes back.
 class QueryEncoder {
 public:
-    virtual std::vector<float> encode(std::string_view text) = 0;
+    virtual Vector<float> encode(std::string_view text) = 0;
     virtual ~QueryEncoder() = default;
 };
 
