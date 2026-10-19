@@ -1,4 +1,4 @@
-// Member 2: ordering of search results - comparison, introsort, binary heap and top-K.
+// Member 2: ordering and exact search - comparison, introsort, binary heap, top-K, brute force.
 //
 // Every ordering in the engine uses closer(): by distance, then by smaller id. Ids are
 // unique, so this is a total order and results never depend on insertion order or on
@@ -188,4 +188,45 @@ void TopK::extractSorted(NeighborArray& out) {
         out[i] = heap.top();
         heap.pop();
     }
+}
+
+// ---------------------------------------------------------------- brute force
+// The exact baseline and ground truth: scores every stored vector against the query and
+// keeps the best k with TopK above, so a query costs O(N log k) instead of sorting all N.
+
+BruteForceIndex::BruteForceIndex(const EmbeddingStore& s) : present(s.size(), false) {
+    store = &s;
+}
+
+void BruteForceIndex::insert(int id, const float* embedding) {
+    checkInsert(*store, id, embedding, present);
+    ids.push(id);
+    present.set(id, true);
+}
+
+void BruteForceIndex::insertAll() {
+    ids.reserve(store->size());
+    for (int i = 0; i < store->size(); i++) insert(i, store->row(i));
+}
+
+void BruteForceIndex::search(const float* query, int queryDim, int k, CandidateArray& out) const {
+    checkSearchArgs(query, queryDim, k, store->dim(), ids.size());
+    TopK top(k);
+    for (int i = 0; i < ids.size(); i++) {
+        Neighbor n;
+        n.dist = distance(query, store->row(ids[i]), queryDim);
+        n.id = ids[i];
+        top.push(n);
+    }
+    NeighborArray best;
+    top.extractSorted(best);
+    toCandidates(best, out);
+}
+
+int BruteForceIndex::size() const {
+    return ids.size();
+}
+
+long long BruteForceIndex::memoryBytes() const {
+    return (long long)ids.capacity() * 4 + present.memoryBytes();
 }

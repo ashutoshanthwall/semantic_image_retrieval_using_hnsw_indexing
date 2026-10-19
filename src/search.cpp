@@ -1,4 +1,5 @@
-// Index interface helpers, the brute-force index, and the SearchEngine (search.h).
+// Index interface helpers and the SearchEngine (search.h). The brute-force index is in
+// dsa/member2_sorting.cpp.
 #include "search.h"
 
 #include <cctype>
@@ -59,45 +60,6 @@ void checkInsert(const EmbeddingStore& store, int id, const float* embedding,
                             " differs from the store row (indexes reference the store)");
     }
     if (present.get(id)) throw Error("insert: id " + std::to_string(id) + " already inserted");
-}
-
-// ---------------------------------------------------------------- brute force
-
-BruteForceIndex::BruteForceIndex(const EmbeddingStore& s) : present(s.size(), false) {
-    store = &s;
-}
-
-void BruteForceIndex::insert(int id, const float* embedding) {
-    checkInsert(*store, id, embedding, present);
-    ids.push(id);
-    present.set(id, true);
-}
-
-void BruteForceIndex::insertAll() {
-    ids.reserve(store->size());
-    for (int i = 0; i < store->size(); i++) insert(i, store->row(i));
-}
-
-void BruteForceIndex::search(const float* query, int queryDim, int k, CandidateArray& out) const {
-    checkSearchArgs(query, queryDim, k, store->dim(), ids.size());
-    TopK top(k);
-    for (int i = 0; i < ids.size(); i++) {
-        Neighbor n;
-        n.dist = distance(query, store->row(ids[i]), queryDim);
-        n.id = ids[i];
-        top.push(n);
-    }
-    NeighborArray best;
-    top.extractSorted(best);
-    toCandidates(best, out);
-}
-
-int BruteForceIndex::size() const {
-    return ids.size();
-}
-
-long long BruteForceIndex::memoryBytes() const {
-    return (long long)ids.capacity() * 4 + present.memoryBytes();
 }
 
 // ---------------------------------------------------------------- search engine

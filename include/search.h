@@ -53,6 +53,7 @@ private:
 };
 
 // ---------------------------------------------------------------- index interface (src/search.cpp)
+// BruteForceIndex's code is in dsa/member2_sorting.cpp.
 
 // Implemented by BruteForceIndex (exact) and HNSWIndex (approximate). Results come back by
 // descending score; equal scores are ordered by ascending id.

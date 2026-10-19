@@ -78,7 +78,7 @@ benchmarking; the search pipeline; the CLI.
 |---|---|---|
 | Dot product, norm, normalisation, distance convention | ✔ (`src/common.cpp`) | — |
 | Growable arrays (`IntArray`, `FloatArray`, `StringArray`, `NeighborArray`, `CandidateArray`: doubling growth, deep copy), `BitArray` | ✔ (`dsa/member4_arrays.cpp`); no STL containers, no templates, no `<algorithm>` anywhere in the C++ code | `new[]` / `delete[]` |
-| Binary heap, introsort (quicksort + heap-sort fallback + insertion sort) | ✔ (`dsa/member2_sorting.cpp`) | — |
+| Binary heap, introsort (quicksort + heap-sort fallback + insertion sort), brute-force index | ✔ (`dsa/member2_sorting.cpp`) | — |
 | Caption keyword search: hash table (open addressing, linear probing), inverted index with merge / galloping intersection | ✔ (`dsa/member1_inverted_index.cpp`) | — |
 | Bounded top-K selection (O(N log K), total `(dist, id)` order) | ✔ heap and comparators | — |
 | Brute-force search | ✔ | — |
