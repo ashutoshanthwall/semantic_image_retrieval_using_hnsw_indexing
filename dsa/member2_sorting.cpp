@@ -1,16 +1,3 @@
-// Member 2: ordering and exact search - comparison, introsort, binary heap, top-K, brute force.
-//
-// Every ordering in the engine uses closer(): by distance, then by smaller id. Ids are
-// unique, so this is a total order and results never depend on insertion order or on
-// which sorting algorithm ran.
-//
-// sortNeighbors is an introsort:
-//   1. quicksort with a median-of-three pivot and Hoare partitioning; it recurses into the
-//      smaller part and loops on the larger, so the recursion depth is O(log n);
-//   2. if the recursion goes deeper than 2*log2(n) (a run of bad pivots), that part is
-//      finished with heap sort, so the worst case stays O(n log n);
-//   3. parts of 16 or fewer items are left for one insertion-sort pass at the end; each item
-//      then moves at most 15 places, so that pass is O(n).
 #include "search.h"
 
 bool closer(const Neighbor& a, const Neighbor& b) {
@@ -37,13 +24,12 @@ static void insertionSort(Neighbor* a, int n) {
     }
 }
 
-// Max-heap sift-down for heap sort: the farthest item rises to the top.
 static void heapSiftDown(Neighbor* a, int n, int i) {
     Neighbor item = a[i];
     while (true) {
         int child = 2 * i + 1;
         if (child >= n) break;
-        if (child + 1 < n && closer(a[child], a[child + 1])) child++;  // the farther child
+        if (child + 1 < n && closer(a[child], a[child + 1])) child++;
         if (!closer(item, a[child])) break;
         a[i] = a[child];
         i = child;
@@ -52,18 +38,14 @@ static void heapSiftDown(Neighbor* a, int n, int i) {
 }
 
 static void heapSort(Neighbor* a, int n) {
-    for (int i = n / 2 - 1; i >= 0; i--) heapSiftDown(a, n, i);  // build a max-heap
+    for (int i = n / 2 - 1; i >= 0; i--) heapSiftDown(a, n, i);
     for (int end = n - 1; end > 0; end--) {
-        swapItems(a[0], a[end]);  // farthest item goes to the back
+        swapItems(a[0], a[end]);
         heapSiftDown(a, end, 0);
     }
 }
 
-// Hoare partition of a[0..n-1], n >= 3. Returns s with 0 < s < n such that every item of
-// a[0..s-1] is <= every item of a[s..n-1].
 static int partition(Neighbor* a, int n) {
-    // Median of three: order a[0] <= a[mid] <= a[n-1]. The two outer items then stop both
-    // scans before they can run off either end.
     int mid = n / 2, last = n - 1;
     if (closer(a[mid], a[0])) swapItems(a[mid], a[0]);
     if (closer(a[last], a[mid])) {
@@ -88,7 +70,7 @@ static void introsortLoop(Neighbor* a, int n, int depthLeft) {
         }
         depthLeft--;
         int s = partition(a, n);
-        if (s < n - s) {  // recurse into the smaller part, loop on the larger
+        if (s < n - s) {
             introsortLoop(a, s, depthLeft);
             a += s;
             n -= s;
@@ -107,8 +89,6 @@ void sortNeighbors(Neighbor* items, int n) {
     insertionSort(items, n);
 }
 
-// ---------------------------------------------------------------- NeighborHeap
-
 NeighborHeap::NeighborHeap(bool closestFirst) {
     closestOnTop = closestFirst;
 }
@@ -117,19 +97,17 @@ bool NeighborHeap::ranksAbove(const Neighbor& a, const Neighbor& b) const {
     return closestOnTop ? closer(a, b) : closer(b, a);
 }
 
-// The item at slot i moves up while it ranks above its parent.
 void NeighborHeap::siftUp(int i) {
     Neighbor item = items[i];
     while (i > 0) {
         int parent = (i - 1) / 2;
         if (!ranksAbove(item, items[parent])) break;
-        items[i] = items[parent];  // parent moves down into the gap
+        items[i] = items[parent];
         i = parent;
     }
     items[i] = item;
 }
 
-// The item at slot i moves down while a child ranks above it.
 void NeighborHeap::siftDown(int i) {
     int n = items.size();
     Neighbor item = items[i];
@@ -138,7 +116,7 @@ void NeighborHeap::siftDown(int i) {
         if (child >= n) break;
         if (child + 1 < n && ranksAbove(items[child + 1], items[child])) child++;
         if (!ranksAbove(items[child], item)) break;
-        items[i] = items[child];  // child moves up into the gap
+        items[i] = items[child];
         i = child;
     }
     items[i] = item;
@@ -150,7 +128,7 @@ void NeighborHeap::push(const Neighbor& item) {
 }
 
 void NeighborHeap::pop() {
-    items[0] = items[items.size() - 1];  // last item fills the gap at the top
+    items[0] = items[items.size() - 1];
     items.pop();
     if (items.size() > 0) siftDown(0);
 }
@@ -159,8 +137,6 @@ const Neighbor& NeighborHeap::top() const { return items[0]; }
 int NeighborHeap::size() const { return items.size(); }
 bool NeighborHeap::empty() const { return items.size() == 0; }
 void NeighborHeap::reserve(int n) { items.reserve(n); }
-
-// ---------------------------------------------------------------- TopK
 
 TopK::TopK(int count) : heap(false) {
     k = count;
@@ -171,7 +147,7 @@ void TopK::push(const Neighbor& item) {
     if (k <= 0) return;
     if (heap.size() < k) {
         heap.push(item);
-    } else if (closer(item, heap.top())) {  // beats the worst item kept
+    } else if (closer(item, heap.top())) {
         heap.pop();
         heap.push(item);
     }
@@ -184,15 +160,11 @@ void TopK::extractSorted(NeighborArray& out) {
     out.clear();
     out.reserve(n);
     for (int i = 0; i < n; i++) out.push(Neighbor());
-    for (int i = n - 1; i >= 0; i--) {  // the max-heap gives the farthest first
+    for (int i = n - 1; i >= 0; i--) {
         out[i] = heap.top();
         heap.pop();
     }
 }
-
-// ---------------------------------------------------------------- brute force
-// The exact baseline and ground truth: scores every stored vector against the query and
-// keeps the best k with TopK above, so a query costs O(N log k) instead of sorting all N.
 
 BruteForceIndex::BruteForceIndex(const EmbeddingStore& s) : present(s.size(), false) {
     store = &s;

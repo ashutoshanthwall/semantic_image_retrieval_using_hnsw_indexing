@@ -1,24 +1,8 @@
-// Member 4: growable arrays and a bit array, written by hand (no STL containers).
-//
-// Every growable array works the same way:
-//   items  - one block of memory from new[]
-//   count  - how many slots are in use
-//   cap    - how many slots the block has
-// push() on a full array allocates a block of twice the size, copies the items over and
-// frees the old block. Doubling means n pushes cost at most about 2n copies in total, so a
-// push is O(1) amortised. A copy constructor and copy assignment copy the whole block
-// (deep copy), so two arrays never share memory and each destructor frees its own block.
-//
-// The five classes differ only in the element type. A C++ template would remove the
-// repetition; we kept separate classes to stay within the language features we use.
 #include "common.h"
 
-// Capacity for a push into a full array of `cap` slots: double it (start at 4).
 static int grownCapacity(int cap) {
     return cap == 0 ? 4 : 2 * cap;
 }
-
-// ---------------------------------------------------------------- IntArray
 
 IntArray::IntArray() {
     items = nullptr;
@@ -93,8 +77,6 @@ bool IntArray::equals(const IntArray& other) const {
     return true;
 }
 
-// ---------------------------------------------------------------- FloatArray
-
 FloatArray::FloatArray() {
     items = nullptr;
     count = 0;
@@ -153,8 +135,6 @@ float FloatArray::operator[](int i) const { return items[i]; }
 float* FloatArray::data() { return items; }
 const float* FloatArray::data() const { return items; }
 
-// ---------------------------------------------------------------- StringArray
-
 StringArray::StringArray() {
     items = nullptr;
     count = 0;
@@ -186,7 +166,7 @@ StringArray::~StringArray() {
 
 void StringArray::push(const std::string& value) {
     if (count == cap) {
-        std::string copy = value;  // `value` may be one of our own items, about to be freed
+        std::string copy = value;
         int newCap = grownCapacity(cap);
         std::string* bigger = new std::string[newCap];
         for (int i = 0; i < count; i++) bigger[i] = items[i];
@@ -210,8 +190,6 @@ bool StringArray::contains(const std::string& value) const {
         if (items[i] == value) return true;
     return false;
 }
-
-// ---------------------------------------------------------------- NeighborArray
 
 NeighborArray::NeighborArray() {
     items = nullptr;
@@ -252,7 +230,7 @@ void NeighborArray::reserve(int newCapacity) {
 }
 
 void NeighborArray::push(const Neighbor& value) {
-    Neighbor copy = value;  // `value` may be one of our own items, about to be freed
+    Neighbor copy = value;
     if (count == cap) reserve(grownCapacity(cap));
     items[count] = copy;
     count++;
@@ -270,8 +248,6 @@ int NeighborArray::capacity() const { return cap; }
 Neighbor& NeighborArray::operator[](int i) { return items[i]; }
 const Neighbor& NeighborArray::operator[](int i) const { return items[i]; }
 Neighbor* NeighborArray::data() { return items; }
-
-// ---------------------------------------------------------------- CandidateArray
 
 CandidateArray::CandidateArray() {
     items = nullptr;
@@ -312,7 +288,7 @@ void CandidateArray::reserve(int newCapacity) {
 }
 
 void CandidateArray::push(const Candidate& value) {
-    Candidate copy = value;  // `value` may be one of our own items, about to be freed
+    Candidate copy = value;
     if (count == cap) reserve(grownCapacity(cap));
     items[count] = copy;
     count++;
@@ -322,9 +298,6 @@ void CandidateArray::clear() { count = 0; }
 int CandidateArray::size() const { return count; }
 Candidate& CandidateArray::operator[](int i) { return items[i]; }
 const Candidate& CandidateArray::operator[](int i) const { return items[i]; }
-
-// ---------------------------------------------------------------- BitArray
-// Flag i lives in word i / 64, at bit position i % 64 inside that word.
 
 BitArray::BitArray() {
     words = nullptr;

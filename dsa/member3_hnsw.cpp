@@ -1,12 +1,3 @@
-// Member 3: HNSW graph index (declared in hnsw.h).
-//
-// Data structures:
-//   nodes[id].links[layer]  - adjacency list of node id on each layer it lives on
-//   nodes[id].inDegree[layer] - how many nodes link to it there (kept up to date)
-//   NeighborHeap (min)      - candidates still to explore, closest on top
-//   NeighborHeap (max)      - best ef results so far, worst on top so it can be evicted
-//   visited[id] == epoch    - "seen in this search"; starting a new search only bumps
-//                             epoch, so clearing the visited set is O(1), not O(N)
 #include "hnsw.h"
 
 #include <cmath>
@@ -82,8 +73,6 @@ float HNSWIndex::dist(const float* q, int id) const {
     return distance(q, firstRow + (long long)id * dims, dims);
 }
 
-// U in (0, 1] from the top 53 bits of a random number, then floor(-ln(U) * mL). Each level
-// is reached with probability 1/M times the one below, like the levels of a skip list.
 int HNSWIndex::randomLevel() {
     double u = ((double)(rng.next() >> 11) + 1.0) * TWO_POW_MINUS_53;
     return (int)std::floor(-std::log(u) * mL);
@@ -91,7 +80,7 @@ int HNSWIndex::randomLevel() {
 
 void HNSWIndex::nextVisitEpoch() const {
     epoch++;
-    if (epoch == 0) {  // wrapped around after 2^32 searches: clear the markers once
+    if (epoch == 0) {
         for (int i = 0; i < numNodes; i++) visited[i] = 0;
         epoch = 1;
     }
@@ -101,7 +90,6 @@ int HNSWIndex::maxDegree(int layer) const {
     return layer == 0 ? 2 * settings.M : settings.M;
 }
 
-// Upper-layer routing: keep moving to the closest neighbour while that gets closer to q.
 Neighbor HNSWIndex::greedyClosest(const float* q, Neighbor current, int layer) const {
     bool improved = true;
     while (improved) {
@@ -125,8 +113,8 @@ Neighbor HNSWIndex::greedyClosest(const float* q, Neighbor current, int layer) c
 void HNSWIndex::searchLayer(const float* q, const NeighborArray& entryPoints, int ef, int layer,
                             NeighborArray& out) const {
     nextVisitEpoch();
-    NeighborHeap candidates(true);  // closest on top: the next node to expand
-    NeighborHeap results(false);    // farthest on top: the worst of the best ef
+    NeighborHeap candidates(true);
+    NeighborHeap results(false);
     for (int i = 0; i < entryPoints.size(); i++) {
         visited[entryPoints[i].id] = epoch;
         candidates.push(entryPoints[i]);
@@ -135,7 +123,6 @@ void HNSWIndex::searchLayer(const float* q, const NeighborArray& entryPoints, in
     }
     while (!candidates.empty()) {
         Neighbor c = candidates.top();
-        // Every remaining candidate is farther than the worst result kept: stop.
         if (closer(results.top(), c)) break;
         candidates.pop();
         const IntArray& links = nodes[c.id].links[layer];
@@ -157,7 +144,7 @@ void HNSWIndex::searchLayer(const float* q, const NeighborArray& entryPoints, in
     out.clear();
     out.reserve(n);
     for (int i = 0; i < n; i++) out.push(Neighbor());
-    for (int i = n - 1; i >= 0; i--) {  // the max-heap gives the farthest first
+    for (int i = n - 1; i >= 0; i--) {
         out[i] = results.top();
         results.pop();
     }
@@ -165,14 +152,10 @@ void HNSWIndex::searchLayer(const float* q, const NeighborArray& entryPoints, in
 
 void HNSWIndex::selectNeighbors(const NeighborArray& candidates, int m, NeighborArray& out) const {
     out.clear();
-    if (!settings.selectHeuristic) {  // naive: the m closest
+    if (!settings.selectHeuristic) {
         for (int i = 0; i < candidates.size() && i < m; i++) out.push(candidates[i]);
         return;
     }
-    // Heuristic: walk the candidates closest first and keep e only if it is closer to the
-    // base node than to every neighbour kept so far. This prefers neighbours in different
-    // directions, which keeps long links between clusters. As in the paper, it runs even
-    // when there are fewer than m candidates.
     NeighborArray discarded;
     out.reserve(m);
     for (int i = 0; i < candidates.size(); i++) {
@@ -192,9 +175,6 @@ void HNSWIndex::selectNeighbors(const NeighborArray& candidates, int m, Neighbor
         else if (settings.keepPrunedConnections)
             discarded.push(e);
     }
-    // keepPrunedConnections (paper Algorithm 4): fill up to m with the closest discarded
-    // candidates. Without it, a node whose candidates all sit in one tight cluster gets a
-    // single link, which later pruning can remove, leaving the node unreachable.
     for (int i = 0; i < discarded.size() && out.size() < m; i++) out.push(discarded[i]);
 }
 
@@ -219,18 +199,14 @@ void HNSWIndex::shrinkNeighbors(int id, int layer) {
     NeighborArray kept;
     selectNeighbors(cands, maxDegree(layer), kept);
     if (settings.protectLastInEdge) {
-        // An edge that is its target's only incoming edge on this layer is kept, in place
-        // of the farthest kept edge whose target has another incoming edge. Without this,
-        // pruning can leave a node that nothing links to (this project's addition, not in
-        // the paper; see README section 6.4).
-        for (int i = 0; i < cands.size(); i++) {  // closest first: deterministic
+        for (int i = 0; i < cands.size(); i++) {
             const Neighbor& c = cands[i];
             if (isKept(kept, c.id) || nodes[c.id].inDegree[layer] > 1) continue;
             if (kept.size() < maxDegree(layer)) {
                 kept.push(c);
                 continue;
             }
-            for (int j = kept.size() - 1; j >= 0; j--) {  // farthest kept edge first
+            for (int j = kept.size() - 1; j >= 0; j--) {
                 if (nodes[kept[j].id].inDegree[layer] > 1) {
                     kept[j] = c;
                     break;
@@ -247,7 +223,7 @@ void HNSWIndex::shrinkNeighbors(int id, int layer) {
 
 void HNSWIndex::insert(int id, const float* embedding) {
     checkInsert(*vectors, id, embedding, present);
-    const float* q = firstRow + (long long)id * dims;  // same values, owned by the store
+    const float* q = firstRow + (long long)id * dims;
     int level = randomLevel();
     Node& node = nodes[id];
     node.level = level;
@@ -260,7 +236,7 @@ void HNSWIndex::insert(int id, const float* embedding) {
     present.set(id, true);
     count++;
 
-    if (entry < 0) {  // first node
+    if (entry < 0) {
         entry = id;
         topLevel = level;
         return;
@@ -283,7 +259,7 @@ void HNSWIndex::insert(int id, const float* embedding) {
             mine.push(chosen[i].id);
             nodes[chosen[i].id].inDegree[layer]++;
         }
-        for (int i = 0; i < chosen.size(); i++) {  // links both ways, then prune to the maximum
+        for (int i = 0; i < chosen.size(); i++) {
             int other = chosen[i].id;
             IntArray& theirs = nodes[other].links[layer];
             theirs.push(id);
@@ -352,14 +328,12 @@ long long HNSWIndex::memoryBytes() const {
     return bytes;
 }
 
-// ---------------------------------------------------------------- saving and loading
-
 void HNSWIndex::getRandomState(uint64_t* words, int& position) const {
     rng.getState(words, position);
 }
 
 void HNSWIndex::restoreNode(int id, int level) {
-    if (level < 0) return;  // node absent from the graph
+    if (level < 0) return;
     Node& node = nodes[id];
     node.level = level;
     node.links = new IntArray[level + 1];
@@ -378,7 +352,6 @@ IntArray& HNSWIndex::restoreLinks(int id, int layer) {
 
 void HNSWIndex::finishRestore(int entryId, int maxLevelValue, const uint64_t* rngWords,
                               int rngPosition) {
-    // In-degrees are not stored in the file; count them from the links.
     for (int i = 0; i < numNodes; i++) {
         for (int l = 0; l <= nodes[i].level; l++) {
             const IntArray& links = nodes[i].links[l];
