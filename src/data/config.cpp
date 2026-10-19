@@ -36,6 +36,7 @@ AppConfig loadConfig(const std::filesystem::path& configFile) {
         c.evaluation.seed = e.at("seed").get<std::uint64_t>();
         c.evaluation.warmupQueries = e.at("warmup_queries").get<int>();
         c.evaluation.repetitions = e.at("repetitions").get<int>();
+        c.evaluation.heldoutCaptionIndex = e.at("heldout_caption_index").get<int>();
         const auto& sweep = e.at("ef_search_sweep");
         if (!sweep.is_array())
             throw ConfigError("evaluation.ef_search_sweep in " + configFile.string() +

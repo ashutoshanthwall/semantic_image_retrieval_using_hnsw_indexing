@@ -316,8 +316,9 @@ Each of these is tested:
 | **G9** HNSW on Flickr30k | Recall@10 at efSearch = 80: **0.9456** (gate ≥ 0.90). Layer-0 graph fully connected: 31,013/31,013 reachable. |
 | **G10** Persistence | Build → save → load in a fresh process → 50 queries: **500/500 results identical** (ids and score bits). One flipped byte (offset 1,781,378: 0x15 → 0xea): rejected, "index file is corrupted (SHA-256 checksum mismatch)". Truncated and missing files are also rejected. |
 | **G11** End to end | `sir_cli a dog playing in snow` returns 5 existing paths, identical for both backends, which are the same 5 dog-in-snow images viewed at G4. |
+| **G12** Caption inverted index | 31,013 images, 15,716 words, 607,917 postings (caption 0, the held-out query caption, excluded). 200 random 1–3 word AND and OR queries: **0** mismatches against a linear scan, about 58× faster. Hash table at load factor 0.48: mean probe length 1.455 (linear-probing theory: 1.46). |
 
-Plus: 48 GoogleTest tests (`ctest`), 16 of them for the hand-written containers and sort, and the Python robustness tests (13 checks).
+Plus: 58 GoogleTest tests (`ctest`), 16 of them for the hand-written containers and sort, and the Python robustness tests (13 checks).
 
 ---
 

@@ -5,13 +5,18 @@
 //   persist-save --index f --out r    build HNSW, save, record 50 query results [G10]
 //   persist-check --index f --expect r   load in a fresh process, compare       [G10]
 //   load-index --index f              try to load an index, report the outcome  [G10]
+//   caption-index --n 200             caption inverted index vs a linear scan    [G12]
+#include <chrono>
 #include <cstdio>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <random>
 #include <sstream>
 
 #include "app_common.hpp"
 #include "data/errors.hpp"
+#include "data/inverted_index.hpp"
 #include "index/brute_force_index.hpp"
 #include "persistence/index_manager.hpp"
 
@@ -33,14 +38,98 @@ std::string resultsText(const HNSWIndex& idx, const EmbeddingStore& queries, int
     return os.str();
 }
 
+bool hasWord(const Vector<std::string>& doc, const std::string& w) {
+    for (const auto& x : doc)
+        if (x == w) return true;
+    return false;
+}
+
+// Builds the caption inverted index, then answers n random AND and OR queries with it and
+// with a linear scan over every image's words; the answers must be identical. Query words
+// come from random indexed captions, so most queries have matches.
+int captionIndexGate(const AppConfig& cfg, int n) {
+    using Clock = std::chrono::steady_clock;
+    auto msSince = [](Clock::time_point t) {
+        return std::chrono::duration<double, std::milli>(Clock::now() - t).count();
+    };
+    const MetadataManager meta = MetadataManager::load(cfg.metadata, cfg.root);
+    const int skip = cfg.evaluation.heldoutCaptionIndex;
+    const auto t0 = Clock::now();
+    const InvertedIndex idx = InvertedIndex::build(meta, skip);
+    const double buildMs = msSince(t0);
+
+    // Baseline data: each image's distinct words (the forward index).
+    Vector<Vector<std::string>> docs(meta.size());
+    for (std::size_t i = 0; i < meta.size(); ++i) {
+        const auto& caps = meta.at(static_cast<int>(i)).captions;
+        for (std::size_t c = 0; c < caps.size(); ++c)
+            if (static_cast<int>(c) != skip)
+                for (auto& w : tokenize(caps[c]))
+                    if (!hasWord(docs[i], w)) docs[i].push_back(std::move(w));
+    }
+
+    std::mt19937_64 rng(cfg.evaluation.seed);
+    Vector<std::string> queries;
+    while (queries.size() < static_cast<std::size_t>(n)) {
+        const auto& caps = meta.at(static_cast<int>(rng() % meta.size())).captions;
+        const auto c = rng() % caps.size();
+        if (static_cast<int>(c) == skip) continue;
+        const Vector<std::string> ws = tokenize(caps[c]);
+        if (ws.empty()) continue;
+        std::string q;
+        for (auto t = 1 + rng() % 3; t > 0; --t) q += ws[rng() % ws.size()] + ' ';
+        queries.push_back(q);
+    }
+
+    int mismatches = 0;
+    std::size_t hitsAll = 0, hitsAny = 0;
+    double idxMs = 0, scanMs = 0;
+    for (const std::string& q : queries) {
+        Vector<std::string> ws = tokenize(q);
+        auto t = Clock::now();
+        const Vector<int> all = idx.matchAll(q), any = idx.matchAny(q);
+        idxMs += msSince(t);
+        t = Clock::now();
+        Vector<int> wantAll, wantAny;
+        for (std::size_t d = 0; d < docs.size(); ++d) {
+            int found = 0;
+            for (const auto& w : ws) found += hasWord(docs[d], w);
+            if (found == static_cast<int>(ws.size())) wantAll.push_back(static_cast<int>(d));
+            if (found > 0) wantAny.push_back(static_cast<int>(d));
+        }
+        scanMs += msSince(t);
+        mismatches += !(all == wantAll) + !(any == wantAny);
+        hitsAll += all.size();
+        hitsAny += any.size();
+    }
+
+    const auto& table = idx.terms();
+    std::cout << std::fixed << std::setprecision(3) << "images=" << meta.size()
+              << " skipped_caption=" << skip << " vocabulary=" << idx.vocabularySize()
+              << " postings=" << idx.postingCount() << " build_ms=" << buildMs << '\n'
+              << "hash table: capacity=" << table.capacity()
+              << " load_factor=" << table.loadFactor()
+              << " avg_probe_length=" << table.averageProbeLength() << '\n'
+              << "queries=" << n << " (1-3 words) mean_hits AND=" << double(hitsAll) / n
+              << " OR=" << double(hitsAny) / n << '\n'
+              << "AND+OR per query: index_us=" << 1000 * idxMs / n
+              << " linear_scan_us=" << 1000 * scanMs / n
+              << " speedup=" << std::setprecision(1) << scanMs / idxMs << "x\n"
+              << "result mismatches vs linear scan: " << mismatches << " -> "
+              << (mismatches == 0 ? "PASS" : "FAIL") << '\n';
+    return mismatches == 0 ? 0 : 1;
+}
+
 int run(int argc, char** argv) {
     const auto args = app::parseArgs(argc, argv);
     if (args.positional.empty()) {
-        std::cerr << "usage: sir_gate <dump-rows|bf-topk|persist-save|persist-check|load-index>\n";
+        std::cerr << "usage: sir_gate <dump-rows|bf-topk|persist-save|persist-check|load-index|"
+                     "caption-index>\n";
         return 2;
     }
     const std::string cmd = args.positional[0];
     const AppConfig cfg = app::loadAppConfig(args);
+    if (cmd == "caption-index") return captionIndexGate(cfg, args.getInt("n", 200));
     const EmbeddingStore store = app::loadImageStore(cfg);
 
     if (cmd == "dump-rows") {

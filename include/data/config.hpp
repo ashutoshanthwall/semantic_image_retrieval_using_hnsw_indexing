@@ -23,6 +23,7 @@ struct EvaluationParams {
     std::uint64_t seed = 0;
     int warmupQueries = 20;
     int repetitions = 5;
+    int heldoutCaptionIndex = 0;  // caption used as the held-out query text for each image
     Vector<int> efSearchSweep;
 };
 

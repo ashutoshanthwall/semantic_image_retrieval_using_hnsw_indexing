@@ -86,4 +86,4 @@ EmbeddingStore EmbeddingStore::load(const std::filesystem::path& binPath,
     return EmbeddingStore(m.dim, std::move(data), normTolerance, sha);
 }
 
-}  // namespace sir
+}

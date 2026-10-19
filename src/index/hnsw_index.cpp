@@ -6,7 +6,7 @@
 #include "algorithms/basic.hpp"
 #include "algorithms/sort.hpp"
 #include "data/errors.hpp"
-#include "index/brute_force_index.hpp"  // checkInsert
+#include "index/brute_force_index.hpp"  
 #include "similarity/vector_math.hpp"
 
 namespace sir {
@@ -38,9 +38,9 @@ float HNSWIndex::dist(std::span<const float> q, int id) const noexcept {
 }
 
 int HNSWIndex::randomLevel() {
-    // U in (0, 1] built from the top 53 bits: portable across standard libraries
-    // (std::uniform_real_distribution is implementation-defined).
+    
     const double u = (static_cast<double>(rng_() >> 11) + 1.0) * 0x1.0p-53;
+
     return static_cast<int>(std::floor(-std::log(u) * mL_));
 }
 
@@ -52,8 +52,7 @@ void HNSWIndex::nextVisitEpoch() const {
 }
 
 Neighbor HNSWIndex::greedyClosest(std::span<const float> q, Neighbor ep, int layer) const {
-    // Upper-layer routing (equivalent to SEARCH-LAYER with ef = 1): move to the closest
-    // neighbour while that strictly improves on the current node.
+   //start from upper layer to lower using greedy search
     for (bool improved = true; improved;) {
         improved = false;
         Neighbor best = ep;
@@ -73,8 +72,8 @@ Vector<Neighbor> HNSWIndex::searchLayer(std::span<const float> q,
                                         const Vector<Neighbor>& entryPoints, int ef,
                                         int layer) const {
     nextVisitEpoch();
-    MinDistHeap candidates;  // C: closest on top — next node to expand
-    MaxDistHeap results;     // W: farthest on top — the current worst of the best ef
+    MinDistHeap candidates;  
+    MaxDistHeap results;     
     for (const Neighbor& e : entryPoints) {
         visited_[static_cast<std::size_t>(e.id)] = epoch_;
         candidates.push(e);
@@ -111,11 +110,7 @@ Vector<Neighbor> HNSWIndex::selectNeighbors(const Vector<Neighbor>& candidates, 
     if (!params_.selectHeuristic)  // naive: the m closest
         return Vector<Neighbor>(candidates.begin(),
                                 candidates.begin() + minOf(limit, candidates.size()));
-    // Heuristic: walk candidates closest-first; keep e only if it is closer to the base
-    // element than to every neighbour already kept. This favours neighbours in
-    // different directions, which preserves long-range connectivity between clusters.
-    // As in the paper (and unlike hnswlib's early return), it is applied even when there
-    // are fewer than m candidates.
+   
     Vector<Neighbor> kept, discarded;
     kept.reserve(limit);
     for (const Neighbor& e : candidates) {
@@ -132,10 +127,7 @@ Vector<Neighbor> HNSWIndex::selectNeighbors(const Vector<Neighbor>& candidates, 
         if (good) kept.push_back(e);
         else if (params_.keepPrunedConnections) discarded.push_back(e);
     }
-    // keepPrunedConnections (paper Alg. 4): top up to m with the closest discarded
-    // candidates. Without it, an outlier whose candidates all lie in one tight cluster gets
-    // a single out-link, hence a single in-link, which later pruning can remove, leaving the
-    // node unreachable. `discarded` is already closest-first.
+    
     for (std::size_t i = 0; i < discarded.size() && kept.size() < limit; ++i)
         kept.push_back(discarded[i]);
     return kept;

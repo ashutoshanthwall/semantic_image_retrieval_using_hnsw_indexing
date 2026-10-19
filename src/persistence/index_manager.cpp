@@ -99,7 +99,9 @@ void IndexManager::save(const HNSWIndex& index, const std::string& modelName,
     w.put(static_cast<std::uint64_t>(store.dim()));
     w.put(static_cast<std::uint64_t>(store.size()));
     w.put(static_cast<std::uint64_t>(index.size()));
+
     const HnswParams& p = index.params();
+
     w.put(static_cast<std::int32_t>(p.M));
     w.put(static_cast<std::int32_t>(p.efConstruction));
     w.put(static_cast<std::int32_t>(p.efSearch));
@@ -108,10 +110,15 @@ void IndexManager::save(const HNSWIndex& index, const std::string& modelName,
     w.put(static_cast<std::uint8_t>(p.keepPrunedConnections ? 1 : 0));
     w.put(static_cast<std::uint8_t>(p.protectLastInEdge ? 1 : 0));
     w.bytes(store.sourceSha256().data(), 64);
+
+
     w.put(static_cast<std::int32_t>(index.entryPoint()));
     w.put(static_cast<std::int32_t>(index.maxLevel()));
     w.str(index.rngState());
+
+
     Writer payload;
+    
     for (std::size_t i = 0; i < store.size(); ++i) {
         const int id = static_cast<int>(i);
         const int level = index.levelOf(id);
