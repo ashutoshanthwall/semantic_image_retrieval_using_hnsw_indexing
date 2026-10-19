@@ -41,3 +41,7 @@ models/
 .env.*
 !.env.example
 
+
+# Project documents (kept locally, not published)
+*.pdf
+*.docx
