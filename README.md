@@ -32,8 +32,8 @@ found and fixed along the way (§6.4).
 **Quick start** (after the pipeline has been run once, see §9):
 
 ```bash
-build/sir_web          # then open http://127.0.0.1:8080  (Ctrl+C to stop)
 build/sir_cli a dog playing in snow
+.venv/bin/python scripts/web_server.py   # then open http://127.0.0.1:8080  (Ctrl+C to stop)
 ```
 
 ---
@@ -50,7 +50,7 @@ build/sir_cli a dog playing in snow
                                    ▼                                 │     ┌──────┴────────────────────────────┐
                         generate_embeddings.py ─► image_embeddings.bin ───►│ EmbeddingStore (owns all vectors) │
                         OpenCV decode, Pillow-      + manifest.json  │     └──────┬───────────────┬────────────┘
-                        exact resample, CLIP        (SHA-256, dim,   │            │ span<const float>
+                        exact resample, CLIP        (SHA-256, dim,   │            │ const float* rows
                         image encoder (GPU)          normalised)     │   ┌────────┴───────┐ ┌─────┴──────────────┐
                                                                      │   │ BruteForceIndex│ │ HNSWIndex          │
  evaluation/queries.txt ─► encode_queries.py ─► query_embeddings.bin ───►│ (ids + top-K   │ │ (ids + adjacency;  │
@@ -67,32 +67,36 @@ build/sir_cli a dog playing in snow
 inference, embedding + metadata persistence, precomputing query embeddings, and the
 CLI's text-encoder helper.
 
-**C++ owns:** loading, validating and storing embeddings; vector math; top-K selection;
-brute-force search; HNSW (graph, insertion, search, pruning); ranking; metadata lookup;
-index persistence and validation; benchmarking; the search pipeline; the CLI.
+**C++ owns:** reading the JSON files; loading, validating and storing embeddings; vector
+math; top-K selection; brute-force search; HNSW (graph, insertion, search, pruning);
+ranking; metadata lookup; caption keyword search; index persistence and validation;
+benchmarking; the search pipeline; the CLI.
 
 ### What is mine vs. what is a library facility
 
 | Component | Implemented here | Library facility used |
 |---|---|---|
-| Dot product, norm, normalisation, distance convention | ✔ (`similarity/vector_math`) | — |
-| Containers and algorithms: `Vector` (growable array), `BinaryHeap`, `BitVector`, `FlatSet` / `FlatMap` (sorted arrays + binary search), `FixedArray`, introsort (quicksort + heap-sort fallback + insertion sort) | ✔ (`include/containers/`, `include/algorithms/`); no STL containers or `<algorithm>` anywhere in the C++ code | `::operator new` / placement new for raw storage |
+| Dot product, norm, normalisation, distance convention | ✔ (`src/common.cpp`) | — |
+| Growable arrays (`IntArray`, `FloatArray`, `StringArray`, `NeighborArray`, `CandidateArray`: doubling growth, deep copy), `BitArray` | ✔ (`dsa/member4_arrays.cpp`); no STL containers, no templates, no `<algorithm>` anywhere in the C++ code | `new[]` / `delete[]` |
+| Binary heap, introsort (quicksort + heap-sort fallback + insertion sort) | ✔ (`dsa/member2_sorting.cpp`) | — |
+| Caption keyword search: hash table (open addressing, linear probing), inverted index with merge / galloping intersection | ✔ (`dsa/member1_inverted_index.cpp`) | — |
 | Bounded top-K selection (O(N log K), total `(dist, id)` order) | ✔ heap and comparators | — |
 | Brute-force search | ✔ | — |
-| HNSW: level assignment, greedy descent, SEARCH-LAYER with candidate min-heap + result max-heap, bidirectional linking, pruning, naive and heuristic neighbour selection, keepPrunedConnections, last-in-edge protection, visited-epoch markers | ✔ entirely | `std::mt19937_64` (raw bits only; the uniform→level mapping is mine) |
+| HNSW: level assignment, greedy descent, SEARCH-LAYER with candidate min-heap + result max-heap, bidirectional linking, pruning, naive and heuristic neighbour selection, keepPrunedConnections, last-in-edge protection, visited-epoch markers | ✔ entirely (`dsa/member3_hnsw.cpp`), including the MT19937-64 random generator, checked against the C++ standard's reference value | — |
 | Index file format, stale/corruption detection, graph validation (degrees, self-loops, layer consistency, BFS reachability) | ✔ | — |
 | SHA-256 (index checksums, embedding-file identity) | ✔ standard FIPS 180-4, tested against NIST vectors | — |
 | Search orchestration, query validation, RAII subprocess | ✔ | POSIX `posix_spawn`, `socketpair` |
-| Latency statistics, recall metrics, system/memory capture | ✔ | `std::chrono::steady_clock`, `/proc` |
-| JSON parsing | — | `nlohmann/json` |
-| HTTP server for the optional web UI | — | `cpp-httplib` |
-| Unit-test framework | — | GoogleTest |
+| Latency statistics, recall metrics, system/memory capture | ✔ | `clock_gettime(CLOCK_MONOTONIC)`, `/proc` |
+| JSON parsing (config, metadata, manifests) | ✔ recursive-descent parser (`src/json.cpp`) | — |
+| Test runner | ✔ a small `check()` framework (`tests/`) | — |
 | Image decoding, colour conversion | — | OpenCV (Python) |
 | Bicubic resampling matching CLIP's processor | ✔ NumPy re-implementation of Pillow's fixed-point algorithm | — |
 | CLIP model, tokenizer, weights | — | `open_clip_torch`, PyTorch |
 
-No existing ANN library (hnswlib, FAISS, etc.) is used anywhere. The C++ side does not
-link OpenCV, because all pixel work happens in Python.
+No existing ANN library (hnswlib, FAISS, etc.) is used anywhere, and the C++ side links
+no third-party library at all. It does not link OpenCV, because all pixel work happens
+in Python. From the C++ standard library it uses only `std::string`, streams for file and
+console I/O, exceptions and the C maths/string functions.
 
 ---
 
@@ -186,16 +190,18 @@ the weights were trained with, and the manifest records this.
 | Object | Owns | Referenced by |
 |---|---|---|
 | `MetadataManager` | all `ImageRecord`s | `SearchEngine` |
-| `EmbeddingStore` | one contiguous `Vector<float>` [N × D] | both indexes, `SearchEngine` (via `std::span`) |
-| `BruteForceIndex` | a vector of ids | `SearchEngine` through `RetrievalIndex&` |
+| `EmbeddingStore` | one contiguous `float` block [N × D] from `new[]` | both indexes, `SearchEngine` (via row pointers) |
+| `BruteForceIndex` | an `IntArray` of ids | `SearchEngine` through `RetrievalIndex&` |
 | `HNSWIndex` | node levels, adjacency lists, in-degrees, visited markers | `SearchEngine` through `RetrievalIndex&` |
 | `SearchEngine` | nothing (non-owning pointers) | the apps |
 | `TextEncoderProcess` | child PID + socket (RAII: closes, waits, escalates to SIGTERM/SIGKILL) | the CLI |
 
 Vectors are stored exactly once. Indexes hold ids only and read rows through
-`EmbeddingStore::row(i)`, which returns a `std::span`. `insert(id, span)` checks that the
-span holds exactly the store's row, so no index can be fed a different vector. There are
-no raw `new`/`delete`; large types are move-only.
+`EmbeddingStore::row(i)`, which returns a pointer to the row. `insert(id, row)` checks
+that the row holds exactly the store's values, so no index can be fed a different vector.
+Memory comes from `new[]` inside classes whose destructors free it. The array classes have
+copy constructors and copy assignment that copy the whole block (deep copy); classes
+that own large data (`EmbeddingStore`, `HNSWIndex`, `MetadataManager`) cannot be copied.
 
 ### 3.2 One distance convention
 `dist(a, b) = 1 − dot(a, b)` on unit vectors, where lower is better. Every priority
@@ -225,8 +231,8 @@ this same compiled function, so the speedup reflects the algorithms, not tuning 
 
 ### 3.4 HNSW (from scratch)
 - **Levels:** `floor(−ln U · mL)` with `mL = 1/ln M`. U ∈ (0, 1] is built from the top 53
-  bits of a seeded `std::mt19937_64`; `std::uniform_real_distribution` is avoided because
-  its output is implementation-defined. Measured distribution: L0 = 31,013, L1 = 1,924,
+  bits of a seeded MT19937-64 (written by hand; same sequence as `std::mt19937_64`).
+  A library uniform distribution is avoided because its output is implementation-defined. Measured distribution: L0 = 31,013, L1 = 1,924,
   L2 = 121, L3 = 11, L4 = 3, L5 = 1 (expected ≈ N/16ᵏ).
 - **Insert:** greedy descent through the layers above the node's level. On each layer
   ≤ its level: SEARCH-LAYER with `efConstruction`, then SELECT-NEIGHBORS(M), then
@@ -247,11 +253,12 @@ this same compiled function, so the speedup reflects the algorithms, not tuning 
   single-threaded by protocol, and multi-threaded search is out of scope.
 
 ### 3.5 Index lifecycle and persistence
-`IndexManager::build / save / load / validate / rebuild`. The file layout is documented
-in `include/persistence/index_manager.hpp`. It contains a magic number `SIRHNSW\0`,
+`IndexManager::build / save / load / validate / rebuild`. The file layout (version 2) is
+documented in `include/storage.h`. It contains a magic number `SIRHNSW\0`,
 format version, model name, dim, store row count, vector count, M / efConstruction /
 efSearch / seed / selection flags, the SHA-256 of the source embedding file, entry point,
-max level, RNG state, adjacency payload, and a trailing SHA-256 over every preceding
+max level, RNG state (312 raw words; version 1 stored the library's text form),
+adjacency payload, and a trailing SHA-256 over every preceding
 byte. Saves write a temp file and rename it, so a half-written index never replaces a
 good one.
 
@@ -269,7 +276,7 @@ After loading it re-runs graph validation.
 query text (trim, collapse whitespace), gets a raw vector from a `QueryEncoder`,
 validates it (dim, NaN/Inf, zero norm) and L2-normalises it. It calls
 `RetrievalIndex::search`, timing only that call, and maps ids to metadata. It never sees
-HNSW internals, and `SearchResult` is the same for both backends.
+HNSW internals, and the results (`CandidateArray`) are the same type for both backends.
 
 **Why the tokenizer is not in C++.** CLIP's tokenizer is a 49k-entry byte-level BPE
 vocabulary plus merge rules and ftfy/HTML cleaning. A subtly wrong port produces
@@ -312,17 +319,31 @@ Each of these is tested:
 | **G5** C++ loader | 5 rows: max abs diff **0.0**, bit-identical; first 4 values identical on both sides. |
 | **G6** Math + top-K | Hand-computed dot/norm/normalise pass; normalisation idempotent; top-K vs full sort **100/100** trials exact including injected ties. |
 | **G7** Brute force vs NumPy | 50 queries, K = 10: **0** id mismatches; max score deviation **4.5e-7** (gate 1e-5). |
-| **G8** HNSW synthetic | N = 10 and N = 100 (D = 8), efSearch = N: identical to brute force for all 50 random + N self-queries, both selection methods. N = 5,000, D = 32, Recall@10 at ef 20/40/80/120: heuristic+keepPruned 0.853 / 0.957 / 0.998 / 1.000; naive 0.845 / 0.947 / 0.993 / 0.998. |
+| **G8** HNSW synthetic | N = 10 and N = 100 (D = 8), efSearch = N: identical to brute force for all 50 random + N self-queries, both selection methods. N = 5,000, D = 32, Recall@10 at ef 20/40/80/120: heuristic+keepPruned 0.830 / 0.947 / 0.996 / 0.999; naive 0.819 / 0.939 / 0.994 / 1.000 (Gaussian test vectors from the project's own generator). |
 | **G9** HNSW on Flickr30k | Recall@10 at efSearch = 80: **0.9456** (gate ≥ 0.90). Layer-0 graph fully connected: 31,013/31,013 reachable. |
 | **G10** Persistence | Build → save → load in a fresh process → 50 queries: **500/500 results identical** (ids and score bits). One flipped byte (offset 1,781,378: 0x15 → 0xea): rejected, "index file is corrupted (SHA-256 checksum mismatch)". Truncated and missing files are also rejected. |
 | **G11** End to end | `sir_cli a dog playing in snow` returns 5 existing paths, identical for both backends, which are the same 5 dog-in-snow images viewed at G4. |
 | **G12** Caption inverted index | 31,013 images, 15,716 words, 607,917 postings (caption 0, the held-out query caption, excluded). 200 random 1–3 word AND and OR queries: **0** mismatches against a linear scan, about 58× faster. Hash table at load factor 0.48: mean probe length 1.455 (linear-probing theory: 1.46). |
 
-Plus: 58 GoogleTest tests (`ctest`), 16 of them for the hand-written containers and sort, and the Python robustness tests (13 checks).
+Plus: `sir_tests` (run by `ctest`), 154 checks in 16 groups covering the arrays, random generator, JSON, store, metadata, hash table, inverted index, math, sorting, top-K, brute force, search engine, HNSW, SHA-256, persistence and the real text encoder; and the Python robustness tests (13 checks).
+
+**Simplification rewrite.** The C++ code was rewritten for a third-semester level: no
+templates, lambdas, `std::span`, move semantics or third-party libraries, and 5 headers
+instead of 29. Before the rewrite, reference outputs were recorded on the full dataset,
+and the rewritten engine reproduces them **bit for bit**: raw embedding rows (G5 data),
+brute-force top-10 for 1,000 queries, HNSW top-10 for 1,000 queries (ids and exact score
+bits, so the graph is identical), every G9 recall and distance count, and the G12 caption
+statistics. The G8 synthetic numbers changed only because the test vectors now come from
+the project's own Gaussian generator.
 
 ---
 
 ## 5. Benchmark
+
+The numbers in this section come from the pinned benchmark run made before the
+simplification rewrite. The rewrite returns bit-identical search results (§4), so every
+recall, distance-count and quality number still holds. Latency and memory depend on the
+code, so re-run `sir_benchmark` (§9) to refresh them.
 
 ### 5.1 Protocol
 - Release build with exactly `-O3 -march=native -DNDEBUG`, single thread.
@@ -383,7 +404,7 @@ operations per accepted neighbour, and visited-marker checks. Brute force stream
 matrix linearly, which the hardware prefetcher handles well.
 
 ### 5.5 Why real-data recall is lower than synthetic recall at the same efSearch
-On 5,000 synthetic vectors, HNSW reaches Recall@10 ≈ 0.998 at ef = 80. On Flickr30k it
+On 5,000 synthetic vectors, HNSW reaches Recall@10 ≈ 0.996 at ef = 80. On Flickr30k it
 reaches 0.946. A measured contributing factor is the **text-image modality gap**. A
 text query's best image has median cosine similarity **0.346**, while an image's
 nearest other image has median cosine **0.825** (`scripts/diag_modality_gap.py`). The
@@ -401,7 +422,9 @@ isolate.
 | Peak RSS (VmHWM) after loading embeddings + queries | 70,295,552 | 67.04 |
 | Peak RSS at end of benchmark | 79,605,760 | 75.92 |
 
-So the HNSW graph adds about 11% on top of the vectors it indexes.
+So the HNSW graph adds about 11% on top of the vectors it indexes. After the rewrite the
+same graph reports `memoryBytes()` = 5,767,500 (5.50 MiB, about 9%), because the new array
+classes carry less bookkeeping per node.
 
 `memoryBytes()` counts **reserved** capacity: 2M+1 ints per node on layer 0 and M+1 on
 upper layers, reserved at insertion to avoid reallocation. That is why it is identical
@@ -419,40 +442,25 @@ advantage matters as the collection grows, because brute force scales linearly w
 
 ---
 
-## 5b. Local web UI (optional demo layer)
+## 5b. Local web page (optional demo layer)
 
-`build/sir_web` serves a single-page UI at **http://127.0.0.1:8080**. It has a search
-box, K (5/10/20), an efSearch slider and example queries. It shows brute-force and HNSW
-results side by side as thumbnails, with scores, image ids and the first caption for
-reference. Above the results it shows text-embedding time, both retrieval latencies,
-speedup and Recall@K. Results that one backend returned and the other did not are
-flagged ("missed by HNSW" / "not in exact top-K"). Moving the slider to a low efSearch
-makes recall loss visible. Searches are kept in the URL (`#q=…&k=…&ef=…`), so they can
-be reloaded or shared.
+`.venv/bin/python scripts/web_server.py` serves a page at **http://127.0.0.1:8080** with a
+search box, K (5/10/20), an efSearch slider and example queries. It shows brute-force and
+HNSW results side by side as thumbnails with scores, the first caption for reference,
+both latencies, speedup and Recall@K, and flags images that one index found and the other
+did not. A low efSearch makes recall loss visible.
 
-Design constraints:
-- It is a thin front end over the same `SearchEngine` and the same comparison routine
-  (`apps/compare.hpp`) as the CLI, and adds no retrieval logic. The engine, the
-  benchmark and all gates are unchanged.
-- **Scope note:** the original brief listed a web UI as out of scope. It was added
-  afterwards at the author's request, as a demo convenience. It is not part of the
-  research result.
-- It binds to `127.0.0.1` by default. Images are served only by numeric internal id
-  (`/img/<id>`), so no client-supplied path ever reaches the filesystem. Page text is
-  inserted with `textContent`, never `innerHTML`.
-- Searches are serialised with a mutex, because `HNSWIndex::search` and the encoder
-  helper are single-threaded by design. Image requests are served concurrently.
-- The UI allows K ≤ 50 and 1 ≤ efSearch ≤ 1000. Bad input gets an HTTP 400 with the
-  engine's specific message.
-- Ctrl+C or SIGTERM stops the server cleanly (a `sigwait` thread), so the text-encoder
-  helper is shut down by its destructor.
-- UI latencies are unpinned single-query medians and are illustrative only. The
-  benchmark (§5) gives the measured numbers.
-- HTTP comes from `cpp-httplib` (header-only, FetchContent, TLS and compression off).
-  The page is plain HTML/CSS/JS in `web/index.html` with no external requests, and it
-  follows the system light/dark setting.
-
-Options: `--port 8080`, `--host 127.0.0.1`, `--index path`, `--encoder-log file`.
+- **All search work is C++.** The Python script (standard library only) serves the page
+  and image files, and starts the engine once as `build/sir_cli --serve`. It sends each
+  search as one line `k<TAB>ef<TAB>query` on the engine's stdin and gets one JSON line
+  back. The engine runs the same `compareBackends` routine as the CLI.
+- Binds to `127.0.0.1` by default. Images are served only by numeric internal id
+  (`/img/<id>`), so no path from the browser reaches the filesystem. Searches are
+  serialised with a lock, because the engine handles one request at a time.
+- K ≤ 50 and 1 ≤ efSearch ≤ 1000; bad input gets HTTP 400 with the engine's message.
+- Ctrl+C closes the engine's input; it exits and stops the text-encoder helper.
+- Latencies on the page are unpinned single-query medians, for illustration only.
+- Options: `--port`, `--host`, `--index`, `--encoder-log`.
 
 ---
 
@@ -546,14 +554,15 @@ bookkeeping always equals a full recount.
 | `extendCandidates` (paper option) | Off, as in common practice. Not evaluated. |
 | Upper-layer routing | Greedy closest-neighbour walk, equivalent to SEARCH-LAYER with ef = 1. |
 | Search ef | `max(efSearch, k)`. |
-| Level RNG | `mt19937_64` bits mapped to (0, 1] by hand, for portability across standard libraries. |
+| Level RNG | MT19937-64 written by hand (same sequence as `std::mt19937_64`); bits mapped to (0, 1] by hand, for portability across standard libraries. |
 | `dot` placement | Out of line, one compiled instance (§3.2). |
 | Text encoder device | CPU in the helper (portable, no GPU contention); GPU for bulk image and query precompute. |
 | IPC | `socketpair` + `posix_spawn` rather than pipes, to avoid SIGPIPE (§3.6). |
-| JSON metadata | A single JSON file (20.5 MB). The C++ apps load metadata plus embeddings, including the SHA-256 and per-row validation, in 0.45 s: simple, and fast enough. |
+| JSON metadata | A single JSON file (20.5 MB), read by the project's own recursive-descent parser into a first-child / next-sibling tree. |
 | C++ OpenCV | Not linked: C++ never touches pixels. |
 | Index checksum | SHA-256 over the whole file, so corruption anywhere is detected, not just in the header. |
-| Web UI | Added after the core project at the author's request, although the brief listed it as out of scope. It is a thin layer over `SearchEngine`, using cpp-httplib, loopback only (§5b). |
+| Code level | Rewritten for a third-semester course: classes, pointers, `new[]`/`delete[]`, operator overloading, virtual functions and exceptions; no templates, lambdas, `std::span`, move semantics or third-party libraries. 5 headers (`include/`), each member's DSA file in `dsa/`. Results verified bit-identical to the earlier version (§4). |
+| Web page | The original C++ web server needed the cpp-httplib library, so after the rewrite the page is served by a standard-library Python script that forwards searches to `sir_cli --serve` (§5b). Added at the author's request; the brief listed a web UI as out of scope. |
 
 ---
 
@@ -585,6 +594,9 @@ bookkeeping always equals a full recount.
    query is not a benchmark. Use `sir_benchmark` numbers.
 10. **Dataset coverage.** 769 Flickr30k images have no captions in the HF source, so they
     are excluded rather than indexed without captions.
+11. **Repeated array code.** Without templates, each growable array (`IntArray`,
+    `FloatArray`, ...) repeats the same code for its element type, and `sortNeighbors`
+    sorts only `Neighbor` items.
 
 ---
 
@@ -593,7 +605,7 @@ bookkeeping always equals a full recount.
 Requirements:
 - Linux x86-64, GCC ≥ 13 (C++20), CMake ≥ 3.20, Python 3.11
 - about 10 GB of free disk
-- network access (Hugging Face and GitHub for FetchContent)
+- network access (Hugging Face, for the dataset and model weights)
 - an NVIDIA GPU is optional (it speeds up the embedding step)
 
 Everything in one go, where each step is a gate and the script stops on the first
@@ -629,13 +641,14 @@ build/sir_benchmark --pin-cpu 4 --measure-encoder  # -> evaluation/benchmark_res
 
 build/sir_cli a dog playing in snow                # one query
 build/sir_cli --k 10 --ef 120                      # interactive; empty line exits
-build/sir_web                                      # web UI at http://127.0.0.1:8080
+build/sir_gate caption-index                       # G12: caption keyword search
+.venv/bin/python scripts/web_server.py             # web page at http://127.0.0.1:8080
 ```
 
 Useful flags:
 - `sir_build_index`: `--select-heuristic heuristic|naive`, `--keep-pruned 0|1`,
   `--protect-in-edge 0|1`, `--M`, `--ef-construction`, `--out`
-- `sir_cli`: `--k`, `--ef`, `--index`, `--encoder-log`
+- `sir_cli`: `--k`, `--ef`, `--index`, `--encoder-log`, `--serve` (engine for the web page)
 
 ---
 
@@ -643,18 +656,19 @@ Useful flags:
 
 ```
 config/config.json          every tunable (model, dim, paths, HNSW, evaluation, seeds)
-include/, src/
-  containers/, algorithms/  hand-written Vector, BinaryHeap, BitVector, FlatSet, FlatMap, FixedArray, sort
-  data/                     config, metadata, error types
-  embedding/                manifest, EmbeddingStore, QueryEncoder, TextEncoderProcess
-  similarity/               vector math, top-K
-  index/                    RetrievalIndex, BruteForceIndex, HNSWIndex
-  persistence/              SHA-256, IndexManager (file format, validation)
-  search/                   SearchEngine
-  benchmark/                latency stats, recall metrics, system info
-apps/                       sir_cli, sir_web, sir_benchmark, sir_build_index, sir_gate (+ compare.hpp shared by cli/web)
-web/                        index.html (the web UI page)
-tests/                      GoogleTest suites (containers + sort, math, top-K, SHA, store, metadata, BF, HNSW, persistence, engine)
+include/                    5 headers, declarations only
+  common.h                  errors, arrays, vector math, timer, MT19937-64, path helpers
+  data.h                    Member 1: JSON, config, metadata, EmbeddingStore, hash table, inverted index
+  search.h                  Member 2: sort, heap, top-K, RetrievalIndex, BruteForceIndex, SearchEngine
+  hnsw.h                    Member 3: HNSWIndex, latency/recall, system info
+  storage.h                 Member 4: SHA-256, IndexManager (file format), TextEncoderProcess, CLI helpers
+dsa/                        each member's DSA-heavy file (compiled into the engine)
+  member1_inverted_index.cpp  member2_sorting.cpp  member3_hnsw.cpp  member4_arrays.cpp
+src/                        the rest of the engine: common, json, data, search, benchmark,
+                            sha256, index_manager, text_encoder, app
+apps/                       sir_cli, sir_benchmark, sir_build_index, sir_gate
+web/                        index.html (the web page; served by scripts/web_server.py)
+tests/                      sir_tests: test_main.cpp + one file per member (154 checks)
 scripts/                    Python pipeline, gate scripts, helper server, plots, run_all.sh
 data/raw/                   read-only after download (git-ignored)
 data/processed/, data/embeddings/   derived data (large files git-ignored; manifests/reports committed)

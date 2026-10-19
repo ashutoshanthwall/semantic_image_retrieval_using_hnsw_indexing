@@ -1,32 +1,11 @@
-#include <gtest/gtest.h>
-
+// Member 3: HNSW graph invariants, exactness at high ef, recall (gate G8), determinism.
 #include <iomanip>
 #include <iostream>
 
-#include "algorithms/basic.hpp"
-#include "containers/bit_vector.hpp"
-#include "containers/flat_set.hpp"
-#include "data/errors.hpp"
-#include "index/brute_force_index.hpp"
-#include "index/hnsw_index.hpp"
-#include "test_helpers.hpp"
+#include "hnsw.h"
+#include "tests.h"
 
-using namespace sir;
-
-namespace {
-
-struct Fixture {
-    EmbeddingStore store;
-    BruteForceIndex bf;
-    HNSWIndex hnsw;
-    Fixture(std::size_t n, std::size_t d, HnswParams p, std::uint64_t seed)
-        : store(d, test::randomUnitVectors(n, d, seed), 1e-5), bf(store), hnsw(store, p) {
-        bf.insertAll();
-        for (std::size_t i = 0; i < n; ++i) hnsw.insert(static_cast<int>(i), store.row(i));
-    }
-};
-
-HnswParams params(int M, int efC, int efS, bool heuristic) {
+static HnswParams params(int M, int efC, int efS, bool heuristic) {
     HnswParams p;
     p.M = M;
     p.efConstruction = efC;
@@ -36,146 +15,182 @@ HnswParams params(int M, int efC, int efS, bool heuristic) {
     return p;
 }
 
-// Checks graph invariants: degree caps, no self loops, no duplicate links, links point to
-// present nodes that exist on that layer, every node reachable from the entry on layer 0.
-void checkInvariants(const HNSWIndex& h, std::size_t n) {
-    for (std::size_t i = 0; i < n; ++i) {
-        const int id = static_cast<int>(i);
-        ASSERT_TRUE(h.contains(id));
-        for (int l = 0; l <= h.levelOf(id); ++l) {
-            const auto nb = h.neighbors(id, l);
-            ASSERT_LE(nb.size(), static_cast<std::size_t>(h.maxDegree(l)));
-            FlatSet<int> uniq;
-            for (int e : nb) uniq.insert(e);
-            ASSERT_EQ(uniq.size(), nb.size()) << "duplicate link at node " << id;
-            for (int e : nb) {
-                ASSERT_NE(e, id) << "self loop";
-                ASSERT_GE(h.levelOf(e), l) << "link to a node absent from layer " << l;
+static void buildAll(HNSWIndex& h, const EmbeddingStore& store, const HnswParams& p) {
+    h.setup(store, p);
+    for (int i = 0; i < store.size(); i++) h.insert(i, store.row(i));
+}
+
+// Degree caps, no self loops, no duplicate links, links only to nodes on that layer,
+// in-degrees equal to a full recount, and every node reachable on layer 0.
+static bool invariantsHold(const HNSWIndex& h, int n) {
+    for (int id = 0; id < n; id++) {
+        if (!h.contains(id)) return false;
+        for (int l = 0; l <= h.levelOf(id); l++) {
+            const IntArray& nb = h.neighbors(id, l);
+            if (nb.size() > h.maxDegree(l)) return false;
+            for (int i = 0; i < nb.size(); i++) {
+                if (nb[i] == id || h.levelOf(nb[i]) < l) return false;
+                for (int j = 0; j < i; j++)
+                    if (nb[j] == nb[i]) return false;
             }
         }
     }
-    // Incremental in-degree bookkeeping must equal a full recount.
-    for (int l = 0; l <= h.maxLevel(); ++l) {
-        Vector<std::uint32_t> cnt(n, 0);
-        for (std::size_t i = 0; i < n; ++i)
-            if (h.levelOf(static_cast<int>(i)) >= l)
-                for (int e : h.neighbors(static_cast<int>(i), l)) ++cnt[static_cast<std::size_t>(e)];
-        for (std::size_t i = 0; i < n; ++i)
-            if (h.levelOf(static_cast<int>(i)) >= l)
-                ASSERT_EQ(cnt[i], h.inDegreeOf(static_cast<int>(i), l)) << "node " << i << " layer " << l;
-    }
-    BitVector seen(n, false);
-    Vector<int> bfs;  // FIFO: read cursor `head`, each node pushed once
-    bfs.push_back(h.entryPoint());
-    seen.set(static_cast<std::size_t>(h.entryPoint()), true);
-    for (std::size_t head = 0; head < bfs.size(); ++head)
-        for (int e : h.neighbors(bfs[head], 0))
-            if (!seen[static_cast<std::size_t>(e)]) {
-                seen.set(static_cast<std::size_t>(e), true);
-                bfs.push_back(e);
+    for (int l = 0; l <= h.maxLevel(); l++) {
+        IntArray count(n, 0);
+        for (int id = 0; id < n; id++)
+            if (h.levelOf(id) >= l) {
+                const IntArray& nb = h.neighbors(id, l);
+                for (int i = 0; i < nb.size(); i++) count[nb[i]]++;
             }
-    EXPECT_EQ(bfs.size(), n) << "layer-0 graph is disconnected";
-}
-
-void expectExactWithHighEf(std::size_t n, std::size_t d, int k, bool heuristic) {
-    Fixture f(n, d, params(4, 16, static_cast<int>(n), heuristic), 99 + n);
-    checkInvariants(f.hnsw, n);
-    const auto qs = test::randomUnitVectors(50, d, 7 + n);
-    int exact = 0;
-    for (int t = 0; t < 50; ++t) {
-        std::span<const float> q(qs.data() + static_cast<std::size_t>(t) * d, d);
-        const auto a = f.bf.search(q, k);
-        const auto b = f.hnsw.search(q, k);
-        ASSERT_EQ(a.size(), b.size());
-        bool same = true;
-        for (std::size_t i = 0; i < a.size(); ++i)
-            same &= a[i].id == b[i].id && a[i].score == b[i].score;
-        exact += same;
-        EXPECT_TRUE(same) << "query " << t;
+        for (int id = 0; id < n; id++)
+            if (h.levelOf(id) >= l && count[id] != h.inDegreeOf(id, l)) return false;
     }
-    // Also every stored vector as its own query.
-    for (std::size_t i = 0; i < n; ++i) {
-        const auto a = f.bf.search(f.store.row(i), k);
-        const auto b = f.hnsw.search(f.store.row(i), k);
-        for (std::size_t r = 0; r < a.size(); ++r) ASSERT_EQ(a[r].id, b[r].id);
-    }
-    std::cout << "[G8] N=" << n << " D=" << d << " k=" << k << " efSearch=" << n
-              << (heuristic ? " heuristic" : " naive") << ": " << exact
-              << "/50 random queries identical to brute force (+" << n
-              << " self-queries)\n";
-}
-
-}  // namespace
-
-TEST(HNSW, G8_Exact_N10_D8) {
-    expectExactWithHighEf(10, 8, 5, true);
-    expectExactWithHighEf(10, 8, 10, true);
-    expectExactWithHighEf(10, 8, 10, false);
-}
-
-TEST(HNSW, G8_Exact_N100_D8) {
-    expectExactWithHighEf(100, 8, 10, true);
-    expectExactWithHighEf(100, 8, 10, false);
-}
-
-TEST(HNSW, G8_Recall_N5000) {
-    constexpr std::size_t N = 5000, D = 32;
-    for (bool heuristic : {true, false}) {
-        Fixture f(N, D, params(16, 200, 20, heuristic), 2024);
-        checkInvariants(f.hnsw, N);
-        const auto qs = test::randomUnitVectors(200, D, 77);
-        std::cout << "[G8] N=5000 D=32 M=16 efC=200 "
-                  << (heuristic ? "heuristic" : "naive    ") << " Recall@10:";
-        double prev = 0.0;
-        for (int ef : {20, 40, 80, 120}) {
-            f.hnsw.setEfSearch(ef);
-            double hits = 0;
-            for (int t = 0; t < 200; ++t) {
-                std::span<const float> q(qs.data() + static_cast<std::size_t>(t) * D, D);
-                const auto a = f.bf.search(q, 10), b = f.hnsw.search(q, 10);
-                FlatSet<int> truth;
-                for (auto& c : a) truth.insert(c.id);
-                for (auto& c : b) hits += truth.count(c.id);
+    BitArray seen(n, false);
+    IntArray queue;
+    queue.push(h.entryPoint());
+    seen.set(h.entryPoint(), true);
+    for (int head = 0; head < queue.size(); head++) {
+        const IntArray& nb = h.neighbors(queue[head], 0);
+        for (int i = 0; i < nb.size(); i++)
+            if (!seen.get(nb[i])) {
+                seen.set(nb[i], true);
+                queue.push(nb[i]);
             }
-            const double recall = hits / (200.0 * 10.0);
-            std::cout << "  ef=" << ef << ":" << std::fixed << std::setprecision(4) << recall;
-            EXPECT_GE(recall + 1e-12, prev) << "recall decreased as efSearch grew";
-            prev = recall;
+    }
+    return queue.size() == n;
+}
+
+// G8 part 1: with efSearch = N the search visits the whole graph, so HNSW must return
+// exactly what brute force returns.
+static void exactWithHighEf(int n, int d, int k, bool heuristic) {
+    EmbeddingStore store;
+    store.setData(d, randomUnitVectors(n, d, 99 + n), 1e-5);
+    BruteForceIndex bf(store);
+    bf.insertAll();
+    HNSWIndex h;
+    buildAll(h, store, params(4, 16, n, heuristic));
+    check(invariantsHold(h, n), "graph invariants, N=" + std::to_string(n));
+    FloatArray qs = randomUnitVectors(50, d, 7 + n);
+    int identical = 0;
+    CandidateArray a, b;
+    for (int t = 0; t < 50; t++) {
+        bf.search(qs.data() + t * d, d, k, a);
+        h.search(qs.data() + t * d, d, k, b);
+        bool same = a.size() == b.size();
+        for (int i = 0; i < a.size() && same; i++) same = a[i].id == b[i].id && a[i].score == b[i].score;
+        if (same) identical++;
+    }
+    bool selfOk = true;
+    for (int i = 0; i < n; i++) {  // every stored vector as its own query
+        bf.search(store.row(i), d, k, a);
+        h.search(store.row(i), d, k, b);
+        for (int r = 0; r < a.size(); r++) selfOk = selfOk && a[r].id == b[r].id;
+    }
+    check(identical == 50 && selfOk, "HNSW == brute force at efSearch = N, N=" + std::to_string(n));
+    std::cout << "  [G8] N=" << n << " D=" << d << " k=" << k << " efSearch=" << n
+              << (heuristic ? " heuristic" : " naive") << ": " << identical
+              << "/50 random queries identical to brute force (+" << n << " self-queries)\n";
+}
+
+void testHnsw() {
+    exactWithHighEf(10, 8, 5, true);
+    exactWithHighEf(10, 8, 10, true);
+    exactWithHighEf(10, 8, 10, false);
+    exactWithHighEf(100, 8, 10, true);
+    exactWithHighEf(100, 8, 10, false);
+
+    // G8 part 2: recall on 5000 random vectors grows with efSearch.
+    const int N = 5000, D = 32;
+    EmbeddingStore store;
+    store.setData(D, randomUnitVectors(N, D, 2024), 1e-5);
+    BruteForceIndex bf(store);
+    bf.insertAll();
+    FloatArray qs = randomUnitVectors(200, D, 77);
+    int sweep[] = {20, 40, 80, 120};
+    for (int variant = 0; variant < 2; variant++) {
+        bool heuristic = variant == 0;
+        HNSWIndex h;
+        buildAll(h, store, params(16, 200, 20, heuristic));
+        check(invariantsHold(h, N), "graph invariants, N=5000");
+        std::cout << "  [G8] N=5000 D=32 M=16 efC=200 " << (heuristic ? "heuristic" : "naive    ")
+                  << " Recall@10:";
+        double previous = 0.0;
+        bool growing = true;
+        CandidateArray a, b;
+        for (int s = 0; s < 4; s++) {
+            h.setEfSearch(sweep[s]);
+            int hits = 0;
+            for (int t = 0; t < 200; t++) {
+                bf.search(qs.data() + t * D, D, 10, a);
+                h.search(qs.data() + t * D, D, 10, b);
+                for (int i = 0; i < b.size(); i++)
+                    for (int j = 0; j < a.size(); j++)
+                        if (b[i].id == a[j].id) hits++;
+            }
+            double recall = hits / 2000.0;
+            std::cout << "  ef=" << sweep[s] << ":" << std::fixed << std::setprecision(4) << recall;
+            growing = growing && recall + 1e-12 >= previous;
+            previous = recall;
         }
         std::cout << "\n";
+        check(growing, "recall never drops as efSearch grows");
+        check(previous >= 0.99, "recall at efSearch=120 is at least 0.99");
     }
-}
 
-TEST(HNSW, DeterministicForFixedSeed) {
-    Fixture a(800, 16, params(8, 64, 32, true), 5), b(800, 16, params(8, 64, 32, true), 5);
-    ASSERT_EQ(a.hnsw.entryPoint(), b.hnsw.entryPoint());
-    for (int i = 0; i < 800; ++i) {
-        ASSERT_EQ(a.hnsw.levelOf(i), b.hnsw.levelOf(i));
-        for (int l = 0; l <= a.hnsw.levelOf(i); ++l) {
-            const auto x = a.hnsw.neighbors(i, l), y = b.hnsw.neighbors(i, l);
-            ASSERT_TRUE(equalRanges(x, y));
-        }
+    // Same seed, same data: the same graph.
+    EmbeddingStore s800;
+    s800.setData(16, randomUnitVectors(800, 16, 5), 1e-5);
+    HNSWIndex x, y;
+    buildAll(x, s800, params(8, 64, 32, true));
+    buildAll(y, s800, params(8, 64, 32, true));
+    bool same = x.entryPoint() == y.entryPoint();
+    for (int i = 0; i < 800 && same; i++) {
+        same = x.levelOf(i) == y.levelOf(i);
+        for (int l = 0; l <= x.levelOf(i) && same; l++) same = x.neighbors(i, l).equals(y.neighbors(i, l));
     }
-}
+    check(same, "fixed seed gives an identical graph");
 
-TEST(HNSW, LevelDistributionFollowsExponentialDecay) {
-    Fixture f(5000, 8, params(16, 32, 16, true), 3);
-    Vector<int> hist(8, 0);
-    for (int i = 0; i < 5000; ++i) ++hist[static_cast<std::size_t>(minOf(f.hnsw.levelOf(i), 7))];
-    // P(level >= 1) = 1/M = 0.0625 -> expect ~312 of 5000; allow a wide binomial band.
-    const int upper = 5000 - hist[0];
-    EXPECT_GT(upper, 240);
-    EXPECT_LT(upper, 390);
-}
+    // P(level >= 1) = 1/M = 1/16: about 312 of 5000 nodes; allow a wide binomial band.
+    EmbeddingStore s5000;
+    s5000.setData(8, randomUnitVectors(5000, 8, 3), 1e-5);
+    HNSWIndex levels;
+    buildAll(levels, s5000, params(16, 32, 16, true));
+    int upper = 0;
+    for (int i = 0; i < 5000; i++)
+        if (levels.levelOf(i) >= 1) upper++;
+    check(upper > 240 && upper < 390, "level distribution: " + std::to_string(upper) + " nodes above layer 0");
 
-TEST(HNSW, ErrorsAndParams) {
-    EmbeddingStore store(4, test::randomUnitVectors(20, 4, 1), 1e-5);
-    EXPECT_THROW(HNSWIndex(store, params(1, 10, 10, true)), IndexError);
-    HNSWIndex h(store, params(4, 10, 10, true));
-    for (int i = 0; i < 20; ++i) h.insert(i, store.row(static_cast<std::size_t>(i)));
-    const auto q = test::randomUnitVectors(1, 4, 9);
-    EXPECT_THROW(h.search(q, 0), QueryError);
-    EXPECT_THROW(h.search(q, 21), QueryError);
-    EXPECT_THROW(h.insert(3, store.row(3)), IndexError);
-    EXPECT_EQ(h.search(q, 20).size(), 20u);  // k larger than efSearch -> ef = k
+    EmbeddingStore tiny;
+    tiny.setData(4, randomUnitVectors(20, 4, 1), 1e-5);
+    bool threw = false;
+    try {
+        HNSWIndex bad;
+        bad.setup(tiny, params(1, 10, 10, true));
+    } catch (const Error&) {
+        threw = true;
+    }
+    check(threw, "M < 2 rejected");
+    HNSWIndex h;
+    buildAll(h, tiny, params(4, 10, 10, true));
+    FloatArray q = randomUnitVectors(1, 4, 9);
+    CandidateArray out;
+    int errors = 0;
+    try {
+        h.search(q.data(), 4, 0, out);
+    } catch (const QueryError&) {
+        errors++;
+    }
+    try {
+        h.search(q.data(), 4, 21, out);
+    } catch (const QueryError&) {
+        errors++;
+    }
+    try {
+        h.insert(3, tiny.row(3));
+    } catch (const Error&) {
+        errors++;
+    }
+    check(errors == 3, "bad K and duplicate insert rejected");
+    h.search(q.data(), 4, 20, out);
+    check(out.size() == 20, "k larger than efSearch: ef becomes k");
 }
